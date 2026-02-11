@@ -13,7 +13,7 @@ struct BoardIndexView: View {
     var body: some View {
         Group {
             if viewModel.isLoading && viewModel.threads.isEmpty {
-                ProgressView("Cargando catálogo...")
+                ProgressView("Loading catalog...")
             } else if let errorMessage = viewModel.errorMessage {
                 errorView(errorMessage)
             } else {
@@ -57,7 +57,7 @@ struct BoardIndexView: View {
             Text(message)
                 .multilineTextAlignment(.center)
                 .foregroundColor(.secondary)
-            Button("Reintentar") {
+            Button("Retry") {
                 Task { await viewModel.fetchCatalog() }
             }
             .buttonStyle(.borderedProminent)
@@ -125,7 +125,7 @@ struct ThreadLoadingView: View {
                     Text(error)
                         .font(.subheadline)
                         .multilineTextAlignment(.center)
-                    Button("Reintentar") {
+                    Button("Retry") {
                         Task { await viewModel.fetchThread() }
                     }
                     .buttonStyle(.bordered)
@@ -135,7 +135,7 @@ struct ThreadLoadingView: View {
                 // Por defecto: Mostramos estado de carga (esto cubre isLoading true y el estado inicial)
                 VStack(spacing: 20) {
                     ProgressView()
-                    Text("Cargando hilo...")
+                    Text("Loading thread...")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }

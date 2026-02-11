@@ -38,8 +38,8 @@ class ThreadViewModel: ObservableObject {
             print("DEBUG: Árbol construido. rootNode es \(rootNode == nil ? "NULO" : "VÁLIDO")")
             self.isLoading = false
         } catch {
-            print("DEBUG: ERROR en fetchThread: \(error)")
-            self.errorMessage = "Error al cargar el hilo: \(error.localizedDescription)"
+            print("DEBUG: ERROR in fetchThread: \(error)")
+            self.errorMessage = "Error loading thread: \(error.localizedDescription)"
             self.isLoading = false
         }
     }

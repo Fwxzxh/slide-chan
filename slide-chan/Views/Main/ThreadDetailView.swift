@@ -4,204 +4,219 @@ struct ThreadDetailView: View {
     let board: String
     let rootNode: ThreadNode
     let depth: Int
-    var onRefresh: (() async -> Void)? = nil // Callback para refrescar desde la raíz
+    var onRefresh: (() async -> Void)? = nil
 
     @AppStorage("isDarkMode") private var isDarkMode = false
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var viewModel = BoardViewModel.shared
+    @State private var isAbbreviated: Bool = true
+    @State private var selectedIndex: Int = 0
+    @State private var showSlideshow: Bool = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
-                // 1. Post "Raíz" actual
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text(rootNode.post.name)
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundColor(.blue)
-
-                        Text(rootNode.post.now)
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-
-                        Spacer()
-
-                        Text("#\(rootNode.post.no)")
-                            .font(.caption2)
-                            .monospaced()
+                if rootNode.post.hasFile {
+                    // Header Area Simple
+                    ZStack {
+                        Color.black // Fondo neutro para evitar saturación
+                        
+                        MediaView(post: rootNode.post, board: board)
+                            .padding(.top, 50)
+                            .padding(.bottom, 20)
+                            .onTapGesture { openSlideshow(at: 0) }
                     }
-
-                    if let fullImageURL = rootNode.post.imageUrl(board: board) {
-                        AsyncImage(url: fullImageURL) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image.resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .cornerRadius(8)
-                            case .failure(_):
-                                Color.gray.opacity(0.2)
-                                    .frame(height: 100)
-                                    .cornerRadius(8)
-                            case .empty:
-                                ProgressView()
-                                    .frame(height: 100)
-                            @unknown default:
-                                EmptyView()
-                            }
-                        }
-                    }
-
-                    SmartText(text: rootNode.post.cleanComment)
-                        .font(.body)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: false)
+                    .frame(minHeight: 300)
+                } else {
+                    Color.clear.frame(height: 100)
                 }
-                .padding()
-                .background(Color(UIColor.systemBackground))
-
-                Divider()
-
-                // 2. Lista de respuestas directas
-                VStack(alignment: .leading, spacing: 0) {
-                    if rootNode.replies.isEmpty {
-                        VStack(spacing: 12) {
-                            Image(systemName: "tray")
-                                .font(.largeTitle)
-                                .foregroundColor(.secondary)
-                            Text("No hay respuestas a este post")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 60)
-                    } else {
-                        Text("Respuestas (\(rootNode.replies.count))")
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal)
-                            .padding(.top, 16)
-                            .padding(.bottom, 8)
-
-                        ForEach(rootNode.replies) { childNode in
-                            // Pasamos el onRefresh hacia abajo para que el botón esté disponible en cualquier nivel
-                            NavigationLink(destination: ThreadDetailView(board: board, rootNode: childNode, depth: depth + 1, onRefresh: onRefresh)) {
-                                ReplyStackCard(node: childNode, board: board)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                            .padding(.vertical, 8)
-                        }
-                    }
-                }
+                
+                contentArea
+                
+                repliesArea
             }
         }
-        .navigationTitle(depth == 0 ? "Hilo #\(rootNode.id)" : "[\(depth)] Respuestas")
-        .navigationBarTitleDisplayMode(.inline)
-        .background(Color(UIColor.secondarySystemBackground).ignoresSafeArea())
+        .coordinateSpace(name: "scroll")
+        .ignoresSafeArea(.container, edges: .top)
+        .navigationBarBackButtonHidden(true)
         .toolbar {
-            if let onRefresh = onRefresh {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        Task { await onRefresh() }
-                    } label: {
-                        Image(systemName: "arrow.clockwise")
+            ToolbarItem(placement: .navigationBarLeading) {
+                customBackButton
+            }
+            ToolbarItem(placement: .navigationBarTrailing) {
+                HStack(spacing: 8) {
+                    bookmarkButton
+                    if let onRefresh = onRefresh {
+                        customRefreshButton(onRefresh)
                     }
+                    galleryButton
                 }
             }
         }
-        .preferredColorScheme(isDarkMode ? .dark : .light)
+        .fullScreenCover(isPresented: $showSlideshow) {
+            FullScreenMediaView(
+                allMediaPosts: getAllNodesInThread().map { $0.post }.filter { $0.hasFile },
+                board: board,
+                currentIndex: $selectedIndex
+            )
+        }
+    }
+
+    private var contentArea: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            postMetadataView
+            
+            if let subject = rootNode.post.sub, !subject.isEmpty {
+                Text(subject.decodedHTML)
+                    .font(.title2.bold())
+            }
+
+            SmartText(text: rootNode.post.cleanComment, lineLimit: isAbbreviated ? 12 : nil)
+                .font(.system(.body, design: .serif))
+                .lineSpacing(6)
+            
+            if rootNode.post.cleanComment.components(separatedBy: "\n").count > 12 {
+                readMoreButton
+            }
+        }
+        .padding(24)
+        .background(Color(UIColor.systemBackground))
+        .cornerRadius(20, corners: [.topLeft, .topRight])
+        .offset(y: rootNode.post.hasFile ? -20 : 0)
+    }
+    
+    private var repliesArea: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if !rootNode.replies.isEmpty {
+                repliesHeader
+                ForEach(rootNode.replies) { childNode in
+                    NavigationLink(destination: ThreadDetailView(board: board, rootNode: childNode, depth: depth + 1, onRefresh: onRefresh)) {
+                        ReplyStackCard(node: childNode, board: board)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.vertical, 8)
+                }
+            }
+        }
+        .background(Color(UIColor.secondarySystemBackground))
+        .offset(y: rootNode.post.hasFile ? -20 : 0)
+    }
+
+    // MARK: - Components (Simplificados)
+    
+    private var bookmarkButton: some View {
+        Button {
+            viewModel.toggleBookmark(board: board, threadId: rootNode.post.no, subject: rootNode.post.sub?.decodedHTML, previewText: rootNode.post.cleanComment)
+        } label: {
+            Image(systemName: viewModel.isBookmarked(board: board, threadId: rootNode.post.no) ? "bookmark.fill" : "bookmark")
+                .font(.system(size: 14, weight: .bold)).foregroundColor(.white)
+                .frame(width: 36, height: 36).background(.ultraThinMaterial).clipShape(Circle())
+        }
+    }
+    
+    private var galleryButton: some View {
+        NavigationLink(destination: ThreadGalleryView(nodes: getAllNodesInThread(), board: board)) {
+            Image(systemName: "square.grid.2x2")
+                .font(.system(size: 14, weight: .bold)).foregroundColor(.white)
+                .frame(width: 36, height: 36).background(.ultraThinMaterial).clipShape(Circle())
+        }
+    }
+
+    private var readMoreButton: some View {
+        Button { withAnimation { isAbbreviated.toggle() } } label: {
+            Text(isAbbreviated ? "READ MORE" : "SHOW LESS").font(.caption.bold())
+                .padding(8).background(Color.blue.opacity(0.1)).cornerRadius(8)
+        }
+    }
+
+    private var postMetadataView: some View {
+        HStack {
+            VStack(alignment: .leading) {
+                Text(rootNode.post.name ?? "Anonymous").font(.subheadline.bold()).foregroundColor(.blue)
+                Text(rootNode.post.now ?? "").font(.caption).foregroundColor(.secondary)
+            }
+            Spacer()
+            Text("#\(String(rootNode.post.no))").font(.caption.monospaced()).foregroundColor(.orange)
+        }
+    }
+
+    private var customBackButton: some View {
+        Button { dismiss() } label: {
+            Image(systemName: "chevron.left").font(.system(size: 14, weight: .bold)).foregroundColor(.white)
+                .frame(width: 36, height: 36).background(.ultraThinMaterial).clipShape(Circle())
+        }
+    }
+
+    private func customRefreshButton(_ action: @escaping () async -> Void) -> some View {
+        Button { Task { await action() } } label: {
+            Image(systemName: "arrow.clockwise").font(.system(size: 14, weight: .bold)).foregroundColor(.white)
+                .frame(width: 36, height: 36).background(.ultraThinMaterial).clipShape(Circle())
+        }
+    }
+
+    private var repliesHeader: some View {
+        Text("Replies (\(rootNode.replies.count))")
+            .font(.caption.bold()).foregroundColor(.secondary)
+            .padding(.horizontal, 24).padding(.top, 32).padding(.bottom, 12)
+    }
+
+    private func getAllNodesInThread() -> [ThreadNode] {
+        var all = [rootNode]
+        func collect(node: ThreadNode) { for reply in node.replies { all.append(reply); collect(node: reply) } }
+        collect(node: rootNode)
+        return all
+    }
+
+    private func openSlideshow(at index: Int) {
+        self.selectedIndex = index
+        self.showSlideshow = true
     }
 }
 
-// MARK: - Subvistas
+// MARK: - Subviews
 
 struct ReplyStackCard: View {
     let node: ThreadNode
     let board: String
-
+    @State private var showFullScreen = false
     var body: some View {
-        ZStack(alignment: .bottom) {
-            if !node.replies.isEmpty {
-                ForEach(1...min(node.replies.count, 2), id: \.self) { i in
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(Color(UIColor.tertiarySystemBackground))
-                        .offset(y: CGFloat(i * 6))
-                        .padding(.horizontal, CGFloat(i * 8))
-                        .opacity(0.4)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(node.post.name ?? "Anonymous").font(.caption.bold()).foregroundColor(.primary)
+                Spacer()
+                if !node.replies.isEmpty {
+                    Text("\(node.replies.count) »").font(.caption2.bold()).foregroundColor(.blue)
                 }
             }
-
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Text(node.post.name)
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.primary)
-
-                    Spacer()
-
-                    if !node.replies.isEmpty {
-                        HStack(spacing: 4) {
-                            Text("\(node.replies.count)")
-                            Image(systemName: "chevron.right.2")
-                        }
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.blue)
-                    }
+            HStack(alignment: .top, spacing: 12) {
+                if let thumbUrl = node.post.thumbnailUrl(board: board) {
+                    AsyncImage(url: thumbUrl) { image in
+                        image.resizable().aspectRatio(contentMode: .fill)
+                    } placeholder: { Color.gray.opacity(0.1) }
+                    .frame(width: 50, height: 50).cornerRadius(8).clipped()
+                    .onTapGesture { showFullScreen = true }
                 }
-
-                HStack(alignment: .top, spacing: 12) {
-                    if let thumbUrl = node.post.thumbnailUrl(board: board) {
-                        AsyncImage(url: thumbUrl) { image in
-                            image.resizable()
-                                .aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Color.gray.opacity(0.1)
-                        }
-                        .frame(width: 50, height: 50)
-                        .cornerRadius(4)
-                        .clipped()
-                    }
-
-                    Text(node.post.cleanComment)
-                        .font(.subheadline)
-                        .lineLimit(4)
-                        .foregroundColor(.primary)
-                        .multilineTextAlignment(.leading)
-                }
+                SmartText(text: node.post.cleanComment).font(.subheadline).lineLimit(4)
             }
-            .padding()
-            .background(Color(UIColor.systemBackground))
-            .cornerRadius(12)
-            .shadow(color: Color.black.opacity(0.1), radius: 2, x: 0, y: 1)
         }
-        .padding(.horizontal)
-        .padding(.bottom, CGFloat(min(node.replies.count, 2) * 6))
+        .padding().background(Color(UIColor.systemBackground)).cornerRadius(12).padding(.horizontal)
+        .fullScreenCover(isPresented: $showFullScreen) {
+            FullScreenMediaView(allMediaPosts: [node.post], board: board, currentIndex: .constant(0))
+        }
     }
 }
 
-#Preview {
-    NavigationView {
-        ThreadDetailView(
-            board: "v",
-            rootNode: ThreadNode(
-                post: Post(
-                    no: 1, resto: 0, time: 0, now: "Ahora", name: "OP",
-                    sub: "Thread Title", com: "Hello World", filename: nil,
-                    ext: nil, tim: nil, w: nil, h: nil, tn_w: nil, tn_h: nil,
-                    replies: 0, images: 0
-                ),
-                replies: [
-                    ThreadNode(post: Post(
-                        no: 2, resto: 1, time: 0, now: "Ahora", name: "Anon",
-                        sub: nil, com: ">>285607335\n>>285607292\nYou did mention it. I rushed my post again.", filename: nil,
-                        ext: nil, tim: nil, w: nil, h: nil, tn_w: nil, tn_h: nil,
-                        replies: 0, images: 0
-                    ))
-                ]
-            ),
-            depth: 0,
-            onRefresh: {}
-        )
+struct RoundedCorner: Shape {
+    var radius: CGFloat = .infinity
+    var corners: UIRectCorner = .allCorners
+    func path(in rect: CGRect) -> Path {
+        let path = UIBezierPath(roundedRect: rect, byRoundingCorners: corners, cornerRadii: CGSize(width: radius, height: radius))
+        return Path(path.cgPath)
+    }
+}
+
+extension View {
+    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
+        clipShape(RoundedCorner(radius: radius, corners: corners))
     }
 }

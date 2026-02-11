@@ -5,76 +5,86 @@ struct ThreadRow: View {
     let board: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Miniatura
-            if let thumbUrl = post.thumbnailUrl(board: board) {
-                AsyncImage(url: thumbUrl) { phase in
-                    switch phase {
-                    case .success(let image):
+        HStack(alignment: .top, spacing: 16) {
+            // Miniatura con sombra sutil
+            ZStack(alignment: .bottomTrailing) {
+                if let thumbUrl = post.thumbnailUrl(board: board) {
+                    AsyncImage(url: thumbUrl) { image in
                         image.resizable()
                             .aspectRatio(contentMode: .fill)
-                    case .failure(_):
-                        Color.gray.opacity(0.2)
-                            .overlay(Image(systemName: "photo").foregroundColor(.secondary))
-                    case .empty:
-                        ProgressView()
-                    @unknown default:
-                        EmptyView()
+                    } placeholder: {
+                        Color.gray.opacity(0.1)
                     }
+                    .frame(width: 85, height: 85)
+                    .cornerRadius(12)
+                    .clipped()
+                } else {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.secondary.opacity(0.1))
+                        .frame(width: 85, height: 85)
+                        .overlay(Image(systemName: "photo").foregroundColor(.secondary))
                 }
-                .frame(width: 80, height: 80)
-                .cornerRadius(8)
-                .clipped()
-            } else {
-                Rectangle()
-                    .fill(Color.secondary.opacity(0.1))
-                    .frame(width: 80, height: 80)
-                    .cornerRadius(8)
-                    .overlay(
-                        Text("No Image")
-                            .font(.system(size: 10))
-                            .foregroundColor(.secondary)
-                    )
             }
 
             // Contenido
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
                     if let sub = post.sub, !sub.isEmpty {
-                        Text(sub)
-                            .font(.subheadline)
-                            .fontWeight(.bold)
+                        Text(sub.decodedHTML)
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(.primary)
                             .lineLimit(1)
+                    } else {
+                        Text("Thread")
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundColor(.secondary)
                     }
 
                     Spacer()
 
-                    Text("#\(post.no)")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                    Text("#\(String(post.no))")
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(.orange.opacity(0.8))
                 }
 
-                SmartText(text: post.cleanComment)
-                    .font(.caption)
+                SmartText(text: post.cleanComment, lineLimit: 2)
+                    .font(.system(size: 13))
                     .foregroundColor(.secondary)
-                    .lineLimit(3)
                     .multilineTextAlignment(.leading)
 
                 Spacer(minLength: 4)
 
-                // Estadísticas
+                // Barra de Estadísticas y Tiempo
                 HStack(spacing: 12) {
-                    Label("\(post.replies ?? 0)", systemImage: "bubble.left")
-                    Label("\(post.images ?? 0)", systemImage: "photo")
+                    HStack(spacing: 12) {
+                        statLabel(value: post.replies ?? 0, icon: "bubble.left.fill")
+                        statLabel(value: post.images ?? 0, icon: "photo.fill")
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.secondary.opacity(0.08))
+                    .cornerRadius(6)
+
                     Spacer()
-                    Text(post.now)
-                        .font(.system(size: 10))
+                    
+                    Text(post.now ?? "")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundColor(.secondary.opacity(0.7))
                 }
-                .font(.system(size: 10, weight: .medium))
-                .foregroundColor(.secondary)
             }
         }
-        .padding(10)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+
+    private func statLabel(value: Int, icon: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.system(size: 10))
+            Text("\(value)")
+                .font(.system(size: 11, weight: .bold))
+        }
+        .foregroundColor(.secondary)
     }
 }
 
@@ -97,7 +107,9 @@ struct ThreadRow: View {
                 tn_w: nil,
                 tn_h: nil,
                 replies: 42,
-                images: 5
+                images: 5,
+                sticky: nil, closed: nil, archived: nil, trip: nil, capcode: nil,
+                country: nil, country_name: nil, filedeleted: nil, spoiler: nil, custom_spoiler: nil
             ),
             board: "v"
         )

@@ -24,7 +24,7 @@ class BoardIndexViewModel: ObservableObject {
             self.threads = fetchedThreads
             self.isLoading = false
         } catch {
-            self.errorMessage = "Error al cargar el catálogo: \(error.localizedDescription)"
+            self.errorMessage = "Error loading catalog: \(error.localizedDescription)"
             self.isLoading = false
             print("Error in BoardIndexViewModel: \(error)")
         }

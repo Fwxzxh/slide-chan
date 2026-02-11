@@ -8,12 +8,24 @@ class APIService {
 
     private init() {}
 
-    enum APIError: Error {
+    enum APIError: Error, LocalizedError {
         case invalidURL
         case invalidResponse
         case decodingError(Error)
         case serverError(Int)
         case unknown(Error)
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidURL: return "Invalid URL"
+            case .invalidResponse: return "Invalid server response"
+            case .decodingError(let error): return "Data processing error: \(error.localizedDescription)"
+            case .serverError(let code):
+                if code == 404 { return "Thread or board no longer exists (404)" }
+                return "Server error (\(code))"
+            case .unknown(let error): return error.localizedDescription
+            }
+        }
     }
 
     /// Generic helper to perform data fetching and decoding
@@ -56,7 +68,7 @@ class APIService {
     /// Fetches the catalog (all threads) for a specific board
     func fetchCatalog(board: String) async throws -> [Post] {
         let pages: [BoardPage] = try await fetch(from: "https://a.4cdn.org/\(board)/catalog.json")
-        return pages.flatMap { $0.threads }
+        return pages.flatMap { $0.threads ?? [] }
     }
 
     /// Fetches all posts within a specific thread

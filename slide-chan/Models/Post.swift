@@ -8,14 +8,14 @@ struct Post: Codable, Identifiable {
     var id: Int { no }
 
     // For replies: this is the ID of the thread being replied to. For OP: this value is zero
-    let resto: Int
+    let resto: Int?
 
     /// UNIX timestamp the post was created
-    let time: Int
+    let time: Int?
     ///MM/DD/YY(Day)HH:MM (:SS on some boards), EST/EDT timezone
-    let now: String
+    let now: String?
     ///Name user posted with. Defaults to Anonymous
-    let name: String
+    let name: String?
 
     // Campos opcionales (no todos los posts tienen imagen o título)
 
@@ -39,10 +39,38 @@ struct Post: Codable, Identifiable {
     let tn_h: Int?
     ///Total number of replies to a thread
     let replies: Int?
-    ///Total number of image replies to a thread
+    /// Total number of image replies to a thread
     let images: Int?
 
+    /// Calculated aspect ratio for the media
+    var aspectRatio: CGFloat {
+        guard let w = w, let h = h, w > 0, h > 0 else { return 1.5 }
+        return CGFloat(w) / CGFloat(h)
+    }
+
+    // Nuevos campos para mejorar la compatibilidad
+    let sticky: Int?
+    let closed: Int?
+    let archived: Int?
+    let trip: String?
+    let capcode: String?
+    let country: String?
+    let country_name: String?
+    let filedeleted: Int?
+    let spoiler: Int?
+    let custom_spoiler: Int?
+
     // MARK: - Helper Properties
+
+    /// Indica si el post tiene un archivo adjunto
+    var hasFile: Bool {
+        return tim != nil && filedeleted != 1
+    }
+
+    /// Indica si la imagen es un spoiler
+    var isSpoiler: Bool {
+        return spoiler == 1
+    }
 
     /// Limpia el comentario de etiquetas HTML, maneja saltos de línea y entidades comunes
     var cleanComment: String {
@@ -54,14 +82,8 @@ struct Post: Codable, Identifiable {
         // 2. Limpiar etiquetas HTML (ej: <span class="quote">)
         text = text.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
 
-        // 3. Decodificar entidades HTML comunes
-        text = text.replacingOccurrences(of: "&quot;", with: "\"")
-            .replacingOccurrences(of: "&amp;", with: "&")
-            .replacingOccurrences(of: "&#039;", with: "'")
-            .replacingOccurrences(of: "&gt;", with: ">")
-            .replacingOccurrences(of: "&lt;", with: "<")
-
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        // 3. Decodificar entidades HTML
+        return text.decodedHTML.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Extrae los IDs de los posts a los que este post responde.
@@ -80,13 +102,44 @@ struct Post: Codable, Identifiable {
     /// Genera la URL de la imagen original (necesitas saber el board)
     func imageUrl(board: String) -> URL? {
         guard let tim = tim, let ext = ext else { return nil }
-        return URL(string: "https://i.4cdn.org/\(board)/\(tim)\(ext)")
+        // Forzamos String(tim) para evitar que el sistema añada separadores de miles
+        return URL(string: "https://i.4cdn.org/\(board)/\(String(tim))\(ext)")
     }
 
     /// Genera la URL de la miniatura
     func thumbnailUrl(board: String) -> URL? {
+        if isSpoiler {
+            return URL(string: "https://s.4cdn.org/image/spoiler.png")
+        }
         guard let tim = tim else { return nil }
-        return URL(string: "https://i.4cdn.org/\(board)/\(tim)s.jpg")
+        // Forzamos String(tim) para evitar separadores en la URL
+        return URL(string: "https://i.4cdn.org/\(board)/\(String(tim))s.jpg")
+    }
+
+    /// Identifica el tipo de media basado en la extensión
+    var mediaType: MediaType {
+        guard let ext = ext?.lowercased() else { return .none }
+        switch ext {
+        case ".jpg", ".jpeg", ".png", ".heic":
+            return .image
+        case ".gif":
+            return .gif
+        case ".webm", ".mp4":
+            return .video
+        case ".pdf":
+            return .pdf
+        default:
+            return .unknown
+        }
+    }
+
+    enum MediaType {
+        case image
+        case gif
+        case video
+        case pdf
+        case none
+        case unknown
     }
 }
 
@@ -98,15 +151,12 @@ struct ThreadResponse: Codable {
 
 extension String {
     var decodedHTML: String {
-        guard let data = self.data(using: .utf8) else { return self }
-        let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
-            .documentType: NSAttributedString.DocumentType.html,
-            .characterEncoding: String.Encoding.utf8.rawValue
-        ]
-        if let attributedString = try? NSAttributedString(data: data, options: options, documentAttributes: nil) {
-            return attributedString.string
-        }
         return self.replacingOccurrences(of: "&quot;", with: "\"")
-                   .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&#039;", with: "'")
+            .replacingOccurrences(of: "&apos;", with: "'")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&nbsp;", with: " ")
     }
 }

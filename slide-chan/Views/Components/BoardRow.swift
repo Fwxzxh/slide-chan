@@ -6,37 +6,45 @@ struct BoardRow: View {
     let toggleFavorite: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(board.displayName)
-                    .font(.headline)
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text(board.displayName)
+                        .font(.headline)
 
-                if isFavorite {
-                    Image(systemName: "star.fill")
-                        .foregroundColor(.yellow)
+                    if !board.isWorkSafe {
+                        Text("NSFW")
+                            .font(.system(size: 8, weight: .black))
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(Color.red.opacity(0.8))
+                            .foregroundColor(.white)
+                            .cornerRadius(4)
+                    }
+                }
+
+                if board.meta_description != nil {
+                    SmartText(text: board.cleanDescription)
                         .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
                 }
             }
-
-            if board.meta_description != nil {
-                SmartText(text: board.cleanDescription)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .lineLimit(3)
-            }
-        }
-        .padding(.vertical, 4)
-        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            
+            Spacer()
+            
+            // Botón de favorito más discreto y accesible
             Button {
                 toggleFavorite()
             } label: {
-                Label(
-                    isFavorite ? "Quitar" : "Favorito",
-                    systemImage: isFavorite ? "star.slash.fill" : "star.fill"
-                )
+                Image(systemName: isFavorite ? "star.fill" : "star")
+                    .foregroundColor(isFavorite ? .blue : .secondary.opacity(0.3))
+                    .font(.system(size: 20))
+                    .frame(width: 44, height: 44)
             }
-            .tint(.yellow)
+            .buttonStyle(PlainButtonStyle())
         }
+        .padding(.vertical, 4)
     }
 }
 

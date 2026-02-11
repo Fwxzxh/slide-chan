@@ -9,12 +9,12 @@ struct Board: Codable, Identifiable {
     let title: String
 
     // 1 si es "Work Safe", 0 si no
-    let ws_board: Int
+    let ws_board: Int?
     /// How many threads are on a single index page
-    let per_page: Int
+    let per_page: Int?
 
     //How many index pages does the board have
-    let pages: Int
+    let pages: Int?
 
     // Otros campos opcionales útiles
 
