@@ -70,9 +70,16 @@ struct ThreadGalleryView: View {
                         Spacer()
                         
                         if node.replies.count > 0 {
-                            Label("\(node.replies.count)", systemImage: "bubble.left.fill")
-                                .font(.caption.bold())
-                                .foregroundColor(.secondary)
+                            HStack(spacing: 4) {
+                                Image(systemName: "bubble.left.fill")
+                                Text("\(node.replies.count)")
+                            }
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.teal)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.teal.opacity(0.15))
+                            .cornerRadius(6)
                         }
                     }
                     

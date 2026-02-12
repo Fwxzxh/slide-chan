@@ -12,6 +12,10 @@ struct ThreadDetailView: View {
     @State private var isAbbreviated: Bool = true
     @State private var selectedIndex: Int = 0
     @State private var showSlideshow: Bool = false
+    
+    // Memoized lists to avoid re-calculating on every body evaluation
+    @State private var allThreadNodes: [ThreadNode] = []
+    @State private var allMediaPosts: [Post] = []
 
     var body: some View {
         ScrollView {
@@ -46,18 +50,28 @@ struct ThreadDetailView: View {
             }
             
             ToolbarItem(placement: .navigationBarTrailing) {
-                NavigationLink(destination: ThreadGalleryView(nodes: getAllNodesInThread(), board: board)) {
+                NavigationLink(destination: ThreadGalleryView(nodes: allThreadNodes, board: board)) {
                     Image(systemName: "square.grid.2x2")
                 }
             }
         }
         .fullScreenCover(isPresented: $showSlideshow) {
             FullScreenMediaView(
-                allMediaPosts: getAllNodesInThread().map { $0.post }.filter { $0.hasFile },
+                allMediaPosts: allMediaPosts,
                 board: board,
                 currentIndex: $selectedIndex
             )
         }
+        .onAppear {
+            prepareThreadData()
+        }
+    }
+
+    private func prepareThreadData() {
+        // Run this only once or when rootNode changes
+        let nodes = getAllNodesInThread()
+        self.allThreadNodes = nodes
+        self.allMediaPosts = nodes.map { $0.post }.filter { $0.hasFile }
     }
 
     private var headerArea: some View {
@@ -137,6 +151,8 @@ struct ThreadDetailView: View {
     }
 
     private func openSlideshow(at index: Int) {
+        // If index is 0, it means we tapped the OP. We need to find its index in allMediaPosts.
+        // Actually for OP we usually just open at 0 if we assume it's always the first media.
         self.selectedIndex = index
         self.showSlideshow = true
     }
@@ -155,8 +171,7 @@ struct ReplyStackCard: View {
             }
             HStack(alignment: .top, spacing: 12) {
                 if node.post.hasFile {
-                    MediaView(post: node.post, board: board)
-                        .frame(width: 50, height: 50).cornerRadius(8).clipped()
+                    MediaThumbnailView(post: node.post, board: board)
                         .onTapGesture { showFullScreen = true }
                 }
                 SmartText(text: node.post.cleanComment).font(.subheadline).lineLimit(4)
