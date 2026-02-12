@@ -17,39 +17,37 @@ struct ThreadDetailView: View {
         ScrollView {
             VStack(spacing: 0) {
                 if rootNode.post.hasFile {
-                    // Header Area Simple
-                    ZStack {
-                        Color.black // Fondo neutro para evitar saturación
-                        
-                        MediaView(post: rootNode.post, board: board)
-                            .padding(.top, 50)
-                            .padding(.bottom, 20)
-                            .onTapGesture { openSlideshow(at: 0) }
-                    }
-                    .frame(minHeight: 300)
+                    headerArea
                 } else {
-                    Color.clear.frame(height: 100)
+                    Color.clear.frame(height: 10)
                 }
                 
                 contentArea
-                
                 repliesArea
             }
         }
-        .coordinateSpace(name: "scroll")
-        .ignoresSafeArea(.container, edges: .top)
-        .navigationBarBackButtonHidden(true)
+        .navigationTitle(depth == 0 ? (rootNode.post.sub?.decodedHTML ?? "Thread #\(String(rootNode.id))") : "[\(depth)] Replies")
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                customBackButton
-            }
             ToolbarItem(placement: .navigationBarTrailing) {
-                HStack(spacing: 8) {
-                    bookmarkButton
-                    if let onRefresh = onRefresh {
-                        customRefreshButton(onRefresh)
+                Button {
+                    viewModel.toggleBookmark(board: board, threadId: rootNode.post.no, subject: rootNode.post.sub?.decodedHTML, previewText: rootNode.post.cleanComment)
+                } label: {
+                    Image(systemName: viewModel.isBookmarked(board: board, threadId: rootNode.post.no) ? "bookmark.fill" : "bookmark")
+                }
+            }
+            
+            if let onRefresh = onRefresh {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button { Task { await onRefresh() } } label: {
+                        Image(systemName: "arrow.clockwise")
                     }
-                    galleryButton
+                }
+            }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                NavigationLink(destination: ThreadGalleryView(nodes: getAllNodesInThread(), board: board)) {
+                    Image(systemName: "square.grid.2x2")
                 }
             }
         }
@@ -62,25 +60,29 @@ struct ThreadDetailView: View {
         }
     }
 
+    private var headerArea: some View {
+        ZStack {
+            Color.black
+            MediaView(post: rootNode.post, board: board)
+                .contentShape(Rectangle())
+                .onTapGesture { openSlideshow(at: 0) }
+        }
+        .frame(minHeight: 300, maxHeight: 500)
+    }
+    
     private var contentArea: some View {
         VStack(alignment: .leading, spacing: 16) {
             postMetadataView
-            
             if let subject = rootNode.post.sub, !subject.isEmpty {
-                Text(subject.decodedHTML)
-                    .font(.title2.bold())
+                Text(subject.decodedHTML).font(.system(size: 24, weight: .black, design: .rounded))
             }
-
             SmartText(text: rootNode.post.cleanComment, lineLimit: isAbbreviated ? 12 : nil)
-                .font(.system(.body, design: .serif))
-                .lineSpacing(6)
-            
+                .font(.system(.body, design: .serif)).lineSpacing(6)
             if rootNode.post.cleanComment.components(separatedBy: "\n").count > 12 {
                 readMoreButton
             }
         }
-        .padding(24)
-        .background(Color(UIColor.systemBackground))
+        .padding(24).background(Color(UIColor.systemBackground))
         .cornerRadius(20, corners: [.topLeft, .topRight])
         .offset(y: rootNode.post.hasFile ? -20 : 0)
     }
@@ -93,70 +95,37 @@ struct ThreadDetailView: View {
                     NavigationLink(destination: ThreadDetailView(board: board, rootNode: childNode, depth: depth + 1, onRefresh: onRefresh)) {
                         ReplyStackCard(node: childNode, board: board)
                     }
-                    .buttonStyle(PlainButtonStyle())
-                    .padding(.vertical, 8)
+                    .buttonStyle(PlainButtonStyle()).padding(.vertical, 8)
                 }
             }
         }
-        .background(Color(UIColor.secondarySystemBackground))
-        .offset(y: rootNode.post.hasFile ? -20 : 0)
+        .background(Color(UIColor.secondarySystemBackground)).offset(y: rootNode.post.hasFile ? -20 : 0)
     }
 
-    // MARK: - Components (Simplificados)
-    
-    private var bookmarkButton: some View {
-        Button {
-            viewModel.toggleBookmark(board: board, threadId: rootNode.post.no, subject: rootNode.post.sub?.decodedHTML, previewText: rootNode.post.cleanComment)
-        } label: {
-            Image(systemName: viewModel.isBookmarked(board: board, threadId: rootNode.post.no) ? "bookmark.fill" : "bookmark")
-                .font(.system(size: 14, weight: .bold)).foregroundColor(.white)
-                .frame(width: 36, height: 36).background(.ultraThinMaterial).clipShape(Circle())
-        }
-    }
-    
-    private var galleryButton: some View {
-        NavigationLink(destination: ThreadGalleryView(nodes: getAllNodesInThread(), board: board)) {
-            Image(systemName: "square.grid.2x2")
-                .font(.system(size: 14, weight: .bold)).foregroundColor(.white)
-                .frame(width: 36, height: 36).background(.ultraThinMaterial).clipShape(Circle())
+    private var postMetadataView: some View {
+        HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(rootNode.post.name ?? "Anonymous")
+                    .font(.system(size: 13, weight: .black)).foregroundColor(.blue)
+                    .padding(.horizontal, 8).padding(.vertical, 4).background(Color.blue.opacity(0.1)).cornerRadius(6)
+                Text(rootNode.post.now ?? "").font(.system(size: 11, weight: .bold)).foregroundColor(.secondary).padding(.leading, 4)
+            }
+            Spacer()
+            Text("#\(String(rootNode.post.no))")
+                .font(.system(size: 11, weight: .heavy, design: .monospaced)).foregroundColor(.orange)
+                .padding(.horizontal, 10).padding(.vertical, 5).background(Color.orange.opacity(0.15)).cornerRadius(8)
         }
     }
 
     private var readMoreButton: some View {
-        Button { withAnimation { isAbbreviated.toggle() } } label: {
-            Text(isAbbreviated ? "READ MORE" : "SHOW LESS").font(.caption.bold())
-                .padding(8).background(Color.blue.opacity(0.1)).cornerRadius(8)
-        }
-    }
-
-    private var postMetadataView: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text(rootNode.post.name ?? "Anonymous").font(.subheadline.bold()).foregroundColor(.blue)
-                Text(rootNode.post.now ?? "").font(.caption).foregroundColor(.secondary)
-            }
-            Spacer()
-            Text("#\(String(rootNode.post.no))").font(.caption.monospaced()).foregroundColor(.orange)
-        }
-    }
-
-    private var customBackButton: some View {
-        Button { dismiss() } label: {
-            Image(systemName: "chevron.left").font(.system(size: 14, weight: .bold)).foregroundColor(.white)
-                .frame(width: 36, height: 36).background(.ultraThinMaterial).clipShape(Circle())
-        }
-    }
-
-    private func customRefreshButton(_ action: @escaping () async -> Void) -> some View {
-        Button { Task { await action() } } label: {
-            Image(systemName: "arrow.clockwise").font(.system(size: 14, weight: .bold)).foregroundColor(.white)
-                .frame(width: 36, height: 36).background(.ultraThinMaterial).clipShape(Circle())
+        Button { withAnimation(.interpolatingSpring(stiffness: 300, damping: 25)) { isAbbreviated.toggle() } } label: {
+            Text(isAbbreviated ? "READ MORE" : "SHOW LESS").font(.system(size: 12, weight: .black))
+                .padding(.vertical, 8).padding(.horizontal, 16).background(Color.blue.opacity(0.1)).foregroundColor(.blue).cornerRadius(8)
         }
     }
 
     private var repliesHeader: some View {
-        Text("Replies (\(rootNode.replies.count))")
-            .font(.caption.bold()).foregroundColor(.secondary)
+        Text("Replies (\(rootNode.replies.count))").font(.system(size: 14, weight: .bold)).foregroundColor(.secondary)
             .padding(.horizontal, 24).padding(.top, 32).padding(.bottom, 12)
     }
 
@@ -173,8 +142,6 @@ struct ThreadDetailView: View {
     }
 }
 
-// MARK: - Subviews
-
 struct ReplyStackCard: View {
     let node: ThreadNode
     let board: String
@@ -184,17 +151,13 @@ struct ReplyStackCard: View {
             HStack {
                 Text(node.post.name ?? "Anonymous").font(.caption.bold()).foregroundColor(.primary)
                 Spacer()
-                if !node.replies.isEmpty {
-                    Text("\(node.replies.count) »").font(.caption2.bold()).foregroundColor(.blue)
-                }
+                if !node.replies.isEmpty { Text("\(node.replies.count) »").font(.caption2.bold()).foregroundColor(.blue) }
             }
             HStack(alignment: .top, spacing: 12) {
-                if let thumbUrl = node.post.thumbnailUrl(board: board) {
-                    AsyncImage(url: thumbUrl) { image in
-                        image.resizable().aspectRatio(contentMode: .fill)
-                    } placeholder: { Color.gray.opacity(0.1) }
-                    .frame(width: 50, height: 50).cornerRadius(8).clipped()
-                    .onTapGesture { showFullScreen = true }
+                if node.post.hasFile {
+                    MediaView(post: node.post, board: board)
+                        .frame(width: 50, height: 50).cornerRadius(8).clipped()
+                        .onTapGesture { showFullScreen = true }
                 }
                 SmartText(text: node.post.cleanComment).font(.subheadline).lineLimit(4)
             }

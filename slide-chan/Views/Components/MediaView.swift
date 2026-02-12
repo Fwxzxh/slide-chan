@@ -4,7 +4,9 @@ import WebKit
 struct MediaView: View {
     let post: Post
     let board: String
+    var isFullScreen: Bool = false
     @State private var loadError = false
+    @State private var retryID = UUID()
     
     var body: some View {
         Group {
@@ -14,6 +16,7 @@ struct MediaView: View {
                 contentView
             }
         }
+        .id(retryID)
     }
 
     @ViewBuilder
@@ -21,11 +24,17 @@ struct MediaView: View {
         let ext = post.ext?.lowercased() ?? ""
         
         if post.mediaType == .image && ext != ".gif" {
-            standardImage
+            if isFullScreen {
+                // Vista con Zoom para pantalla completa
+                if let url = post.imageUrl(board: board) {
+                    ZoomableImageView(url: url)
+                }
+            } else {
+                standardImage
+            }
         } else {
-            // GIF, WebM, MP4
             if let url = post.imageUrl(board: board) {
-                SimpleWebPlayer(url: url)
+                SimpleWebPlayer(url: url, isFullScreen: isFullScreen)
                     .aspectRatio(post.aspectRatio, contentMode: .fit)
                     .frame(maxWidth: .infinity)
             }
@@ -39,10 +48,10 @@ struct MediaView: View {
                 image.resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(maxWidth: .infinity)
+                    .onAppear { loadError = false }
             case .failure(_):
                 Color.clear.onAppear { loadError = true }
             case .empty:
-                // Placeholder con dimensiones reales para evitar que se "aplane"
                 ZStack {
                     Color.secondary.opacity(0.05)
                     ProgressView()
@@ -56,19 +65,45 @@ struct MediaView: View {
     }
 
     private var errorPlaceholder: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill").foregroundColor(.orange)
-            Text("Failed to load").font(.caption2).bold()
+        VStack(spacing: 16) {
+            HStack(spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.orange)
+                Text("Failed to load")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity)
+            .background(.ultraThinMaterial)
+            .cornerRadius(12)
+            .padding(.horizontal, 20)
+            
+            Button {
+                loadError = false
+                retryID = UUID()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.clockwise")
+                    Text("Retry Connection")
+                }
+                .font(.system(size: 14, weight: .bold))
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(Color.blue)
+                .cornerRadius(25)
+                .shadow(color: .blue.opacity(0.3), radius: 10)
+            }
         }
         .frame(maxWidth: .infinity)
         .aspectRatio(post.aspectRatio, contentMode: .fit)
-        .background(Color.secondary.opacity(0.1))
-        .cornerRadius(12)
     }
 }
 
 struct SimpleWebPlayer: UIViewRepresentable {
     let url: URL
+    let isFullScreen: Bool
     
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -76,15 +111,17 @@ struct SimpleWebPlayer: UIViewRepresentable {
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.backgroundColor = .black
         webView.scrollView.isScrollEnabled = false
-        webView.isUserInteractionEnabled = false
+        webView.isUserInteractionEnabled = isFullScreen
         return webView
     }
     
     func updateUIView(_ uiView: WKWebView, context: Context) {
         let isGif = url.pathExtension.lowercased() == "gif"
+        let videoAttrs = isFullScreen ? "playsinline loop autoplay controls" : "playsinline loop autoplay muted"
+        
         let mediaTag = isGif ? 
             "<img src=\"\(url.absoluteString)\" style=\"width:100%;height:100%;object-fit:contain;\">" :
-            "<video playsinline loop autoplay muted style=\"width:100%;height:100%;object-fit:contain;\"><source src=\"\(url.absoluteString)\"></video>"
+            "<video \(videoAttrs) style=\"width:100%;height:100%;object-fit:contain;\"><source src=\"\(url.absoluteString)\"></video>"
             
         let html = """
         <html>
@@ -94,9 +131,7 @@ struct SimpleWebPlayer: UIViewRepresentable {
                 body { margin:0; padding:0; background-color:black; display:flex; align-items:center; justify-content:center; height:100vh; overflow:hidden; }
             </style>
         </head>
-        <body>
-            \(mediaTag)
-        </body>
+        <body>\(mediaTag)</body>
         </html>
         """
         uiView.loadHTMLString(html, baseURL: url)

@@ -15,7 +15,7 @@ struct FullScreenMediaView: View {
             
             TabView(selection: $currentIndex) {
                 ForEach(allMediaPosts.indices, id: \.self) { index in
-                    MediaView(post: allMediaPosts[index], board: board)
+                    MediaView(post: allMediaPosts[index], board: board, isFullScreen: true)
                         .tag(index)
                         .onTapGesture {
                             withAnimation { showControls.toggle() }
@@ -26,80 +26,49 @@ struct FullScreenMediaView: View {
             .ignoresSafeArea()
             
             if showControls {
+                // Toolbar Superior Nativa
                 VStack {
-                    // Top Controls
-                    HStack(spacing: 0) {
-                        Button {
-                            dismiss()
-                        } label: {
+                    HStack {
+                        Button(action: { dismiss() }) {
                             Image(systemName: "xmark")
-                                .font(.system(size: 16, weight: .bold))
-                                .foregroundColor(.white)
-                                .frame(width: 40, height: 40)
-                                .background(Color.black.opacity(0.4))
-                                .background(.ultraThinMaterial)
-                                .clipShape(Circle())
                         }
                         
                         Spacer()
                         
                         if let filename = allMediaPosts[currentIndex].filename {
                             Text(filename + (allMediaPosts[currentIndex].ext ?? ""))
-                                .font(.system(size: 11, weight: .bold, design: .monospaced))
-                                .foregroundColor(.white.opacity(0.8))
+                                .font(.caption.bold())
                                 .lineLimit(1)
                                 .truncationMode(.middle)
-                                .frame(maxWidth: .infinity)
-                                .padding(.horizontal, 10)
                         }
 
                         Spacer()
                         
-                        HStack(spacing: 12) {
-                            Button {
-                                copyImageLink()
-                            } label: {
+                        HStack(spacing: 20) {
+                            Button(action: copyImageLink) {
                                 Image(systemName: "link")
-                                    .font(.system(size: 16, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .frame(width: 40, height: 40)
-                                    .background(Color.black.opacity(0.4))
-                                    .background(.ultraThinMaterial)
-                                    .clipShape(Circle())
                             }
-                            
-                            Button {
-                                shareMedia()
-                            } label: {
-                                Image(systemName: "square.and.arrow.down")
-                                    .font(.system(size: 16, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .frame(width: 40, height: 40)
-                                    .background(Color.black.opacity(0.4))
-                                    .background(.ultraThinMaterial)
-                                    .clipShape(Circle())
+                            Button(action: shareMedia) {
+                                Image(systemName: "square.and.arrow.up")
                             }
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 10)
+                    .padding()
+                    .background(.ultraThinMaterial)
                     
                     Spacer()
                     
-                    // Index Indicator
+                    // Indicador Inferior Nativo
                     Text("\(currentIndex + 1) / \(allMediaPosts.count)")
-                        .font(.system(size: 12, weight: .black))
-                        .foregroundColor(.white)
+                        .font(.caption.bold())
                         .padding(.horizontal, 12)
                         .padding(.vertical, 6)
-                        .background(Color.black.opacity(0.5))
-                        .cornerRadius(20)
+                        .background(.ultraThinMaterial)
+                        .clipShape(Capsule())
                         .padding(.bottom, 20)
                 }
-                .transition(.opacity)
             }
         }
-        .navigationBarHidden(true)
     }
     
     private func copyImageLink() {
