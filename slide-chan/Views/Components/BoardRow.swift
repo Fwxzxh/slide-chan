@@ -12,6 +12,12 @@ struct BoardRow: View {
                 HStack {
                     Text(board.displayName)
                         .font(.headline)
+                    
+                    if isFavorite {
+                        Image(systemName: "star.fill")
+                            .font(.caption)
+                            .foregroundColor(.appAccent)
+                    }
 
                     if !board.isWorkSafe {
                         Text("NSFW")
@@ -33,17 +39,6 @@ struct BoardRow: View {
             }
             
             Spacer()
-            
-            // Discreet favorite button
-            Button {
-                toggleFavorite()
-            } label: {
-                Image(systemName: isFavorite ? "star.fill" : "star")
-                    .foregroundColor(isFavorite ? .appAccent : .secondary.opacity(0.3))
-                    .font(.system(size: 20))
-                    .frame(width: 44, height: 44)
-            }
-            .buttonStyle(PlainButtonStyle())
         }
         .padding(.vertical, 4)
     }

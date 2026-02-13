@@ -138,7 +138,7 @@ struct ThreadDetailView: View {
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)
-        .padding(.bottom, 24)
+        .padding(.bottom, 16)
         .background(Color(UIColor.systemBackground))
     }
     
@@ -151,8 +151,11 @@ struct ThreadDetailView: View {
                     NavigationLink(destination: ThreadDetailView(board: board, rootNode: childNode, depth: depth + 1, onRefresh: onRefresh)) {
                         ReplyStackCard(node: childNode, board: board)
                     }
-                    .buttonStyle(PlainButtonStyle()).padding(.vertical, 8)
+                    .buttonStyle(PlainButtonStyle())
+                    .padding(.vertical, 2)
                 }
+                // Add some bottom padding to the whole list
+                Color.clear.frame(height: 20)
             }
         }
         .background(Color.mainBackground)
@@ -214,8 +217,24 @@ struct ThreadDetailView: View {
 
     /// Section header for the replies list.
     private var repliesHeader: some View {
-        Text("Replies (\(rootNode.replies.count))").font(.system(size: 14, weight: .bold)).foregroundColor(.secondary)
-            .padding(.horizontal, 24).padding(.top, 32).padding(.bottom, 12)
+        HStack {
+            Text("Replies")
+                .font(.system(size: 14, weight: .black))
+                .foregroundColor(.secondary)
+            
+            Spacer()
+            
+            Text("\(rootNode.replies.count)")
+                .font(.system(size: 12, weight: .heavy))
+                .foregroundColor(.secondary.opacity(0.8))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.secondary.opacity(0.1))
+                .cornerRadius(6)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 16)
+        .padding(.bottom, 8)
     }
 
     /// Recursively collects all nodes in the thread tree.
