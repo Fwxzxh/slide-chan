@@ -1,6 +1,8 @@
 import SwiftUI
 
+/// View displaying the catalog of threads for a specific board.
 struct BoardIndexView: View {
+    /// The short ID of the board.
     let board: String
     @StateObject private var viewModel: BoardIndexViewModel
     @AppStorage("isDarkMode") private var isDarkMode = false
@@ -41,6 +43,7 @@ struct BoardIndexView: View {
         .preferredColorScheme(isDarkMode ? .dark : .light)
     }
 
+    /// List of threads in the board.
     private var threadsList: some View {
         List(viewModel.threads) { thread in
             NavigationLink(destination: ThreadLoadingView(board: board, threadId: thread.no)) {
@@ -51,6 +54,7 @@ struct BoardIndexView: View {
         .listStyle(.plain)
     }
 
+    /// Inline error view for catalog loading failures.
     private func errorView(_ message: String) -> some View {
         VStack(spacing: 20) {
             Image(systemName: "wifi.exclamationmark").font(.largeTitle).foregroundColor(.secondary)
@@ -60,15 +64,18 @@ struct BoardIndexView: View {
     }
 }
 
+/// Container view that handles loading a thread before displaying its detail.
 struct ThreadLoadingView: View {
     let board: String
     let threadId: Int
     @StateObject private var viewModel: ThreadViewModel
+    
     init(board: String, threadId: Int) {
         self.board = board
         self.threadId = threadId
         self._viewModel = StateObject(wrappedValue: ThreadViewModel(board: board, threadId: threadId))
     }
+    
     var body: some View {
         ZStack {
             Color(UIColor.secondarySystemBackground).ignoresSafeArea()
@@ -81,7 +88,10 @@ struct ThreadLoadingView: View {
                     Button("Retry") { Task { await viewModel.fetchThread() } }.buttonStyle(.bordered)
                 }.padding()
             } else {
-                VStack(spacing: 20) { ProgressView(); Text("Loading thread...").font(.caption).foregroundColor(.secondary) }
+                VStack(spacing: 20) { 
+                    ProgressView()
+                    Text("Loading thread...").font(.caption).foregroundColor(.secondary) 
+                }
             }
         }
         .navigationBarTitleDisplayMode(.inline)

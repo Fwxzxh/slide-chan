@@ -2,29 +2,42 @@ import Foundation
 import Combine
 import SwiftUI
 
+/// Represents a thread bookmarked by the user.
 struct BookmarkedThread: Codable, Identifiable, Hashable {
-    let id: String // board_threadId
+    /// Unique identifier: board_threadId.
+    let id: String
+    /// The short ID of the board.
     let board: String
+    /// The thread ID.
     let threadId: Int
+    /// Optional thread subject.
     let subject: String?
+    /// Preview text from the OP comment.
     let previewText: String?
+    /// When the bookmark was created.
     let timestamp: Date
 }
 
+/// ViewModel for managing boards, favorites, and bookmarks.
 @MainActor
 class BoardViewModel: ObservableObject {
-    static let shared = BoardViewModel() // Singleton for easier access across views
+    /// Singleton instance for shared access.
+    static let shared = BoardViewModel(apiService: APIService.shared)
     
+    /// List of all available boards.
     @Published var boards: [Board] = []
+    /// Set of favorite board short IDs.
     @Published var favoriteBoardIDs: Set<String> = []
+    /// Indicates if a network request is in progress.
     @Published var isLoading: Bool = false
+    /// Holds the error message if the last request failed.
     @Published var errorMessage: String?
     
-    // Bookmark Logic
+    /// List of user bookmarks.
     @Published var bookmarks: [BookmarkedThread] = []
     private let bookmarksKey = "bookmarked_threads_final"
 
-    /// Filtro opcional para mostrar solo tablones SFW (Safe For Work)
+    /// Filter to only show Safe For Work (SFW) boards.
     @Published var showOnlySFW: Bool = false {
         didSet {
             filterBoards()
@@ -32,16 +45,18 @@ class BoardViewModel: ObservableObject {
     }
 
     private var allBoards: [Board] = []
-    private let apiService = APIService.shared
+    private let apiService: APIServiceProtocol
     private let favoritesKey = "favorite_boards_ids"
 
-    init() {
+    init(apiService: APIServiceProtocol) {
+        self.apiService = apiService
         loadFavorites()
         loadBookmarks()
     }
 
     // MARK: - Bookmarks Logic
 
+    /// Toggles a thread's bookmark status.
     func toggleBookmark(board: String, threadId: Int, subject: String?, previewText: String?) {
         let id = "\(board)_\(threadId)"
         if let index = bookmarks.firstIndex(where: { $0.id == id }) {
@@ -60,6 +75,7 @@ class BoardViewModel: ObservableObject {
         saveBookmarks()
     }
 
+    /// Checks if a thread is bookmarked.
     func isBookmarked(board: String, threadId: Int) -> Bool {
         let id = "\(board)_\(threadId)"
         return bookmarks.contains(where: { $0.id == id })
@@ -80,7 +96,7 @@ class BoardViewModel: ObservableObject {
 
     // MARK: - Boards Logic
 
-    /// Obtiene la lista completa de tablones usando el APIService
+    /// Fetches the full list of boards from the API.
     func fetchBoards() async {
         isLoading = true
         errorMessage = nil
@@ -107,14 +123,17 @@ class BoardViewModel: ObservableObject {
 
     // MARK: - Favorites Logic
 
+    /// Returns the subset of favorite boards.
     var favoriteBoards: [Board] {
         allBoards.filter { favoriteBoardIDs.contains($0.board) }
     }
 
+    /// Checks if a board is marked as favorite.
     func isFavorite(_ board: Board) -> Bool {
         favoriteBoardIDs.contains(board.board)
     }
 
+    /// Toggles a board's favorite status.
     func toggleFavorite(_ board: Board) {
         withAnimation(.interpolatingSpring(stiffness: 300, damping: 25)) {
             if favoriteBoardIDs.contains(board.board) {

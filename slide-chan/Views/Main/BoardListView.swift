@@ -1,14 +1,16 @@
 import SwiftUI
 
+/// Main view displaying the list of all available boards.
 struct BoardListView: View {
     @StateObject private var viewModel = BoardViewModel.shared
     @State private var searchText = ""
     @AppStorage("isDarkMode") private var isDarkMode = false
 
+    /// Filtered boards based on search text and favorites.
     var filteredBoards: [Board] {
         let boards = viewModel.boards
         
-        // Si estamos buscando, mostramos todo mezclado para facilitar la búsqueda
+        // If searching, show all matches mixed to simplify discovery
         if !searchText.isEmpty {
             return boards.filter {
                 $0.board.localizedCaseInsensitiveContains(searchText) ||
@@ -16,7 +18,7 @@ struct BoardListView: View {
             }
         }
         
-        // Si no buscamos, solo devolvemos los que NO son favoritos para la sección principal
+        // If not searching, return boards that are NOT favorites for the main section
         return boards.filter { !viewModel.isFavorite($0) }
     }
 
@@ -26,7 +28,11 @@ struct BoardListView: View {
                 if viewModel.isLoading && viewModel.boards.isEmpty {
                     ProgressView("Loading boards...")
                 } else if let errorMessage = viewModel.errorMessage {
-                    errorView(errorMessage)
+                    ErrorView(message: errorMessage) {
+                        Task {
+                            await viewModel.fetchBoards()
+                        }
+                    }
                 } else {
                     boardsList
                 }
@@ -45,61 +51,28 @@ struct BoardListView: View {
             .refreshable {
                 await viewModel.fetchBoards()
             }
-            .animation(.default, value: viewModel.favoriteBoardIDs) // Anima cambios en favoritos
+            .animation(.default, value: viewModel.favoriteBoardIDs) // Animate favorite changes
         }
         .preferredColorScheme(isDarkMode ? .dark : .light)
     }
 
     // MARK: - View Components
 
+    /// The list containing bookmarks, favorites, and all boards.
     private var boardsList: some View {
         List {
             // Bookmarked Threads
             if !viewModel.bookmarks.isEmpty && searchText.isEmpty {
-                Section(header: Text("Bookmarked Threads")) {
-                    ForEach(viewModel.bookmarks) { bookmark in
-                        NavigationLink(destination: ThreadLoadingView(board: bookmark.board, threadId: bookmark.threadId)) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text("/\(bookmark.board)/")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 2)
-                                        .background(Color.blue)
-                                        .cornerRadius(4)
-                                    
-                                    if let subject = bookmark.subject, !subject.isEmpty {
-                                        Text(subject)
-                                            .font(.subheadline.bold())
-                                            .lineLimit(1)
-                                    } else {
-                                        Text("Thread #\(String(bookmark.threadId))")
-                                            .font(.subheadline.bold())
-                                    }
-                                }
-                                
-                                if let preview = bookmark.previewText, !preview.isEmpty {
-                                    Text(preview)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(2)
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) {
+                    Section(header: Text("Bookmarked Threads")) {
+                        ForEach(viewModel.bookmarks) { bookmark in
+                            BookmarkRow(bookmark: bookmark) {
                                 viewModel.toggleBookmark(board: bookmark.board, threadId: bookmark.threadId, subject: nil, previewText: nil)
-                            } label: {
-                                Label("Delete", systemImage: "trash")
                             }
                         }
                     }
-                }
             }
 
-            // Sección de Favoritos
+            // Favorites Section
             if !viewModel.favoriteBoards.isEmpty && searchText.isEmpty {
                 Section(header: Text("Favorites")) {
                     ForEach(viewModel.favoriteBoards) { board in
@@ -108,7 +81,7 @@ struct BoardListView: View {
                 }
             }
 
-            // Sección de Todos los Tablones
+            // All Boards Section
             Section(header: Text(searchText.isEmpty ? "All Boards" : "Results")) {
                 ForEach(filteredBoards) { board in
                     navigationLink(for: board)
@@ -118,6 +91,7 @@ struct BoardListView: View {
         .listStyle(.insetGrouped)
     }
 
+    /// Generates a navigation link for a given board.
     private func navigationLink(for board: Board) -> some View {
         NavigationLink(destination: BoardIndexView(board: board.board)) {
             BoardRow(
@@ -130,23 +104,7 @@ struct BoardListView: View {
         }
     }
 
-    private func errorView(_ message: String) -> some View {
-        VStack(spacing: 16) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.largeTitle)
-                .foregroundColor(.red)
-            Text(message)
-                .multilineTextAlignment(.center)
-            Button("Retry") {
-                Task {
-                    await viewModel.fetchBoards()
-                }
-            }
-            .buttonStyle(.bordered)
-        }
-        .padding()
-    }
-
+    /// Toolbar item for toggling dark mode.
     private var darkModeToolbarItem: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
             Button {
@@ -158,6 +116,7 @@ struct BoardListView: View {
         }
     }
 
+    /// Toolbar item for filtering boards (e.g., SFW only).
     private var filterToolbarItem: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
             Menu {

@@ -1,9 +1,13 @@
 import SwiftUI
 import UIKit
 
+/// A view for displaying media in a full-screen paging interface.
 struct FullScreenMediaView: View {
+    /// List of posts containing media to display.
     let allMediaPosts: [Post]
+    /// The short ID of the board.
     let board: String
+    /// Binding to the currently selected media index.
     @Binding var currentIndex: Int
     
     @Environment(\.dismiss) private var dismiss
@@ -26,7 +30,7 @@ struct FullScreenMediaView: View {
             .ignoresSafeArea()
             
             if showControls {
-                // Toolbar Superior Nativa
+                // Top Toolbar
                 VStack {
                     HStack {
                         Button(action: { dismiss() }) {
@@ -58,7 +62,7 @@ struct FullScreenMediaView: View {
                     
                     Spacer()
                     
-                    // Indicador Inferior Nativo
+                    // Page Indicator
                     Text("\(currentIndex + 1) / \(allMediaPosts.count)")
                         .font(.caption.bold())
                         .padding(.horizontal, 12)
@@ -71,12 +75,14 @@ struct FullScreenMediaView: View {
         }
     }
     
+    /// Copies the original image URL to the clipboard.
     private func copyImageLink() {
         if let url = allMediaPosts[currentIndex].imageUrl(board: board) {
             UIPasteboard.general.url = url
         }
     }
     
+    /// Opens the native share sheet for the current media.
     private func shareMedia() {
         guard let url = allMediaPosts[currentIndex].imageUrl(board: board) else { return }
         let av = UIActivityViewController(activityItems: [url], applicationActivities: nil)

@@ -1,9 +1,14 @@
 import SwiftUI
 
+/// Detailed view for a single thread, displaying the OP and its replies in a hierarchical or list format.
 struct ThreadDetailView: View {
+    /// The short ID of the board.
     let board: String
+    /// The root node of the thread (OP).
     let rootNode: ThreadNode
+    /// Current recursion depth (used when nesting replies).
     let depth: Int
+    /// Optional refresh action.
     var onRefresh: (() async -> Void)? = nil
 
     @AppStorage("isDarkMode") private var isDarkMode = false
@@ -67,13 +72,14 @@ struct ThreadDetailView: View {
         }
     }
 
+    /// Prepares flattened lists of nodes and media for gallery and slideshow features.
     private func prepareThreadData() {
-        // Run this only once or when rootNode changes
         let nodes = getAllNodesInThread()
         self.allThreadNodes = nodes
         self.allMediaPosts = nodes.map { $0.post }.filter { $0.hasFile }
     }
 
+    /// Hero area for the thread, typically showing OP media.
     private var headerArea: some View {
         ZStack {
             Color.black
@@ -84,6 +90,7 @@ struct ThreadDetailView: View {
         .frame(minHeight: 300, maxHeight: 500)
     }
     
+    /// Main content area for the post body and metadata.
     private var contentArea: some View {
         VStack(alignment: .leading, spacing: 16) {
             postMetadataView
@@ -96,11 +103,12 @@ struct ThreadDetailView: View {
                 readMoreButton
             }
         }
-        .padding(24).background(Color(UIColor.systemBackground))
-        .cornerRadius(20, corners: [.topLeft, .topRight])
+        .padding(Theme.horizontalPadding).background(Color.cardBackground)
+        .cornerRadius(Theme.largeCornerRadius, corners: [.topLeft, .topRight])
         .offset(y: rootNode.post.hasFile ? -20 : 0)
     }
     
+    /// Area displaying the list of replies to the current post.
     private var repliesArea: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !rootNode.replies.isEmpty {
@@ -113,9 +121,10 @@ struct ThreadDetailView: View {
                 }
             }
         }
-        .background(Color(UIColor.secondarySystemBackground)).offset(y: rootNode.post.hasFile ? -20 : 0)
+        .background(Color.mainBackground).offset(y: rootNode.post.hasFile ? -20 : 0)
     }
 
+    /// Horizontal view displaying poster information and post number.
     private var postMetadataView: some View {
         HStack(alignment: .center, spacing: 10) {
             VStack(alignment: .leading, spacing: 4) {
@@ -131,6 +140,7 @@ struct ThreadDetailView: View {
         }
     }
 
+    /// Button to toggle the abbreviation of long comments.
     private var readMoreButton: some View {
         Button { withAnimation(.interpolatingSpring(stiffness: 300, damping: 25)) { isAbbreviated.toggle() } } label: {
             Text(isAbbreviated ? "READ MORE" : "SHOW LESS").font(.system(size: 12, weight: .black))
@@ -138,11 +148,13 @@ struct ThreadDetailView: View {
         }
     }
 
+    /// Section header for the replies list.
     private var repliesHeader: some View {
         Text("Replies (\(rootNode.replies.count))").font(.system(size: 14, weight: .bold)).foregroundColor(.secondary)
             .padding(.horizontal, 24).padding(.top, 32).padding(.bottom, 12)
     }
 
+    /// Recursively collects all nodes in the thread tree.
     private func getAllNodesInThread() -> [ThreadNode] {
         var all = [rootNode]
         func collect(node: ThreadNode) { for reply in node.replies { all.append(reply); collect(node: reply) } }
@@ -150,40 +162,14 @@ struct ThreadDetailView: View {
         return all
     }
 
+    /// Opens the full-screen media slideshow.
     private func openSlideshow(at index: Int) {
-        // If index is 0, it means we tapped the OP. We need to find its index in allMediaPosts.
-        // Actually for OP we usually just open at 0 if we assume it's always the first media.
         self.selectedIndex = index
         self.showSlideshow = true
     }
 }
 
-struct ReplyStackCard: View {
-    let node: ThreadNode
-    let board: String
-    @State private var showFullScreen = false
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(node.post.name ?? "Anonymous").font(.caption.bold()).foregroundColor(.primary)
-                Spacer()
-                if !node.replies.isEmpty { Text("\(node.replies.count) »").font(.caption2.bold()).foregroundColor(.blue) }
-            }
-            HStack(alignment: .top, spacing: 12) {
-                if node.post.hasFile {
-                    MediaThumbnailView(post: node.post, board: board)
-                        .onTapGesture { showFullScreen = true }
-                }
-                SmartText(text: node.post.cleanComment).font(.subheadline).lineLimit(4)
-            }
-        }
-        .padding().background(Color(UIColor.systemBackground)).cornerRadius(12).padding(.horizontal)
-        .fullScreenCover(isPresented: $showFullScreen) {
-            FullScreenMediaView(allMediaPosts: [node.post], board: board, currentIndex: .constant(0))
-        }
-    }
-}
-
+/// Shape that allows rounding specific corners of a rectangle.
 struct RoundedCorner: Shape {
     var radius: CGFloat = .infinity
     var corners: UIRectCorner = .allCorners
@@ -194,6 +180,7 @@ struct RoundedCorner: Shape {
 }
 
 extension View {
+    /// Applies a corner radius to specific corners of the view.
     func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
         clipShape(RoundedCorner(radius: radius, corners: corners))
     }

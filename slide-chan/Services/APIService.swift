@@ -1,13 +1,26 @@
 import Foundation
 
+/// Protocol defining the API service requirements for 4chan communication.
+protocol APIServiceProtocol {
+    /// Fetches the list of all available boards.
+    func fetchBoards() async throws -> [Board]
+    /// Fetches the catalog for a specific board.
+    func fetchCatalog(board: String) async throws -> [Post]
+    /// Fetches all posts within a specific thread.
+    func fetchThread(board: String, threadId: Int) async throws -> [Post]
+}
+
 /// Service responsible for all 4chan API communications.
-/// Centralizing network logic ensures consistency and easier testing.
-class APIService {
-    static let shared = APIService()
+///
+/// Centralizing network logic ensures consistency and facilitates testing via mocks.
+final class APIService: APIServiceProtocol, Sendable {
+    /// Global instance accessible from any context.
+    nonisolated static let shared: APIServiceProtocol = APIService()
     private let decoder = JSONDecoder()
 
     private init() {}
 
+    /// Possible errors encountered during API requests.
     enum APIError: Error, LocalizedError {
         case invalidURL
         case invalidResponse
@@ -28,7 +41,7 @@ class APIService {
         }
     }
 
-    /// Generic helper to perform data fetching and decoding
+    /// Generic helper to perform data fetching and decoding.
     private func fetch<T: Decodable>(from urlString: String) async throws -> T {
         guard let url = URL(string: urlString) else {
             throw APIError.invalidURL
@@ -59,21 +72,18 @@ class APIService {
 
     // MARK: - API Methods
 
-    /// Fetches the list of all available boards
     func fetchBoards() async throws -> [Board] {
-        let response: BoardsResponse = try await fetch(from: "https://a.4cdn.org/boards.json")
+        let response: BoardsResponse = try await fetch(from: APIConstants.boards())
         return response.boards
     }
 
-    /// Fetches the catalog (all threads) for a specific board
     func fetchCatalog(board: String) async throws -> [Post] {
-        let pages: [BoardPage] = try await fetch(from: "https://a.4cdn.org/\(board)/catalog.json")
+        let pages: [BoardPage] = try await fetch(from: APIConstants.catalog(board: board))
         return pages.flatMap { $0.threads ?? [] }
     }
 
-    /// Fetches all posts within a specific thread
     func fetchThread(board: String, threadId: Int) async throws -> [Post] {
-        let response: ThreadResponse = try await fetch(from: "https://a.4cdn.org/\(board)/thread/\(threadId).json")
+        let response: ThreadResponse = try await fetch(from: APIConstants.thread(board: board, threadId: threadId))
         return response.posts
     }
 }

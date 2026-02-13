@@ -1,73 +1,70 @@
 import Foundation
 import Combine
 
+/// ViewModel for a single thread, managing its posts and hierarchical structure.
 @MainActor
 class ThreadViewModel: ObservableObject {
+    /// The flat list of posts in the thread.
     @Published var posts: [Post] = []
+    /// The root node of the thread's comment tree.
     @Published var rootNode: ThreadNode?
+    /// Indicates if a network request is in progress.
     @Published var isLoading: Bool = false
+    /// Holds the error message if the last request failed.
     @Published var errorMessage: String?
 
     private let board: String
     private let threadId: Int
-    private let apiService = APIService.shared
+    private let apiService: APIServiceProtocol
 
-    init(board: String, threadId: Int) {
+    init(board: String, threadId: Int, apiService: APIServiceProtocol = APIService.shared) {
         self.board = board
         self.threadId = threadId
+        self.apiService = apiService
     }
 
-    /// Fetches all posts from a specific thread and builds the hierarchical tree
+    /// Fetches all posts from a specific thread and builds the hierarchical tree.
     func fetchThread() async {
-        print("DEBUG: Iniciando fetchThread para hilo \(threadId) en board /\(board)/")
-        guard !isLoading else {
-            print("DEBUG: Fetch cancelado - ya está cargando")
-            return
-        }
+        guard !isLoading else { return }
 
         isLoading = true
         errorMessage = nil
 
         do {
             let fetchedPosts = try await apiService.fetchThread(board: board, threadId: threadId)
-            print("DEBUG: API respondió con \(fetchedPosts.count) posts")
-
             self.posts = fetchedPosts
             buildTree(from: fetchedPosts)
-
-            print("DEBUG: Árbol construido. rootNode es \(rootNode == nil ? "NULO" : "VÁLIDO")")
             self.isLoading = false
         } catch {
-            print("DEBUG: ERROR in fetchThread: \(error)")
             self.errorMessage = "Error loading thread: \(error.localizedDescription)"
             self.isLoading = false
         }
     }
 
-    /// Convierte la lista plana de posts de 4chan en una estructura de árbol.
+    /// Converts the flat list of 4chan posts into a tree structure.
     private func buildTree(from allPosts: [Post]) {
         guard let op = allPosts.first else {
             self.rootNode = nil
             return
         }
 
-        // 1. Crear un diccionario de todos los posts envueltos en nodos (clases) para acceso rápido
+        // 1. Create a dictionary of all posts wrapped in nodes (classes) for fast access
         let nodes = allPosts.reduce(into: [Int: ThreadNode]()) { dict, post in
             dict[post.no] = ThreadNode(post: post)
         }
 
-        // 2. Relacionar cada post con sus padres (quienes son citados)
+        // 2. Relate each post with its parents (those it cites)
         for post in allPosts {
             guard let currentNode = nodes[post.no] else { continue }
             let quotedIds = post.replyIds()
 
-            // En 4chan, si un post no cita a nadie específicamente, se considera respuesta al OP
+            // In 4chan, if a post doesn't cite anyone specifically, it is considered a reply to the OP
             if quotedIds.isEmpty && post.no != op.no {
                 nodes[op.no]?.replies.append(currentNode)
             } else {
-                // Usamos un Set para evitar duplicados si un post cita varias veces al mismo post
+                // Use a Set to avoid duplicates if a post cites the same post multiple times
                 for pId in Set(quotedIds) {
-                    // Evitamos auto-citas y verificamos que el post citado exista en este hilo
+                    // Avoid self-citations and verify the cited post exists in this thread
                     if pId != post.no, let parentNode = nodes[pId] {
                         parentNode.replies.append(currentNode)
                     }
@@ -75,14 +72,13 @@ class ThreadViewModel: ObservableObject {
             }
         }
 
-        // 3. Asignamos el nodo raíz.
-        // Esto disparará la actualización de la UI en ThreadLoadingView
+        // 3. Assign the root node
         if let opNode = nodes[op.no] {
             self.rootNode = opNode
         }
     }
 
-    /// Helper to refresh the thread
+    /// Refreshes the thread's posts.
     func refresh() async {
         await fetchThread()
     }

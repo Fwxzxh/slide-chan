@@ -1,7 +1,10 @@
 import SwiftUI
 
+/// A view that renders text with support for Greentext and link detection.
 struct SmartText: View {
+    /// The raw text to display.
     let text: String
+    /// Maximum number of lines to display.
     var lineLimit: Int? = nil
 
     var body: some View {
@@ -21,17 +24,17 @@ struct SmartText: View {
         .font(.subheadline)
     }
 
-    /// Crea un AttributedString con estilos y detección de enlaces
+    /// Creates an AttributedString with styles and link detection.
     private func attributedString(for line: String) -> AttributedString {
         var attrString = AttributedString(line)
         attrString.foregroundColor = .primary
 
-        // 1. Estilo de cita (Greentext) - Suele ser toda la línea
+        // 1. Greentext style - Typically an entire line starting with '>'
         if line.starts(with: ">") && !line.starts(with: ">>") {
             attrString.foregroundColor = .green
         }
 
-        // 2. Detección de menciones (>>12345) en cualquier parte del texto
+        // 2. Mention detection (>>12345) anywhere in the text
         let mentionPattern = ">>([0-9]+)"
         if let regex = try? NSRegularExpression(pattern: mentionPattern) {
             let nsLine = line as NSString
@@ -46,7 +49,7 @@ struct SmartText: View {
             }
         }
 
-        // 3. Detección de enlaces URL
+        // 3. URL detection
         let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
         let matches = detector?.matches(in: line, options: [], range: NSRange(line.startIndex..., in: line)) ?? []
         
@@ -61,4 +64,13 @@ struct SmartText: View {
 
         return attrString
     }
+}
+
+#Preview {
+    VStack(alignment: .leading, spacing: 20) {
+        SmartText(text: ">Greentext example\nRegular text with >>12345 reference.\nhttps://google.com link")
+        
+        SmartText(text: "Line 1\nLine 2\nLine 3 (Hidden)", lineLimit: 2)
+    }
+    .padding()
 }

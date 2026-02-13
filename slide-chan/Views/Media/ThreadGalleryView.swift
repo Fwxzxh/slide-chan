@@ -1,13 +1,17 @@
 import SwiftUI
 
+/// A gallery view displaying all media files within a thread.
 struct ThreadGalleryView: View {
+    /// List of all nodes in the thread.
     let nodes: [ThreadNode]
+    /// The short ID of the board.
     let board: String
     @Environment(\.dismiss) private var dismiss
     @State private var visibleItemsCount = 15
     @State private var selectedIndex = 0
     @State private var showSlideshow = false
     
+    /// Filters nodes to only include unique posts with file attachments.
     private var mediaNodes: [ThreadNode] {
         var seen = Set<Int>()
         var unique: [ThreadNode] = []
@@ -48,6 +52,7 @@ struct ThreadGalleryView: View {
         }
     }
     
+    /// Stream of media views with context metadata.
     private var contentStream: some View {
         ForEach(Array(mediaNodes.prefix(visibleItemsCount).enumerated()), id: \.element.post.no) { index, node in
             VStack(alignment: .leading, spacing: 16) {
@@ -105,6 +110,7 @@ struct ThreadGalleryView: View {
         }
     }
     
+    /// Increases the number of visible items (infinite scroll).
     private func loadMore() {
         if visibleItemsCount < mediaNodes.count {
             visibleItemsCount += 15

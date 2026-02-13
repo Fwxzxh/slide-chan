@@ -1,6 +1,8 @@
 import SwiftUI
 
+/// A view that provides pinch-to-zoom and drag functionality for an image.
 struct ZoomableImageView: View {
+    /// The URL of the image to display.
     let url: URL
     
     @State private var scale: CGFloat = 1.0
@@ -18,14 +20,14 @@ struct ZoomableImageView: View {
                         .aspectRatio(contentMode: .fit)
                         .scaleEffect(scale)
                         .offset(offset)
-                        // GESTO DE PINCH (Magnificación)
+                        // Pinch Gesture (Magnification)
                         .gesture(
                             MagnificationGesture()
                                 .onChanged { value in
                                     let delta = value / lastScale
                                     lastScale = value
                                     let newScale = scale * delta
-                                    // Limitar zoom máximo y mínimo
+                                    // Limit zoom scale
                                     scale = min(max(newScale, 1.0), 5.0)
                                 }
                                 .onEnded { _ in
@@ -35,7 +37,7 @@ struct ZoomableImageView: View {
                                     }
                                 }
                         )
-                        // GESTO DE ARRASTRE (Solo si hay zoom)
+                        // Drag Gesture (Only if zoomed)
                         .gesture(
                             scale > 1.0 ? 
                             DragGesture()
@@ -50,7 +52,7 @@ struct ZoomableImageView: View {
                                 }
                             : nil
                         )
-                        // GESTO DE DOBLE TAP
+                        // Double Tap Gesture to toggle zoom
                         .onTapGesture(count: 2) {
                             withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) {
                                 if scale > 1.0 {
@@ -72,6 +74,7 @@ struct ZoomableImageView: View {
         }
     }
     
+    /// Resets the image to its original scale and position.
     private func resetImageState() {
         withAnimation(.spring()) {
             scale = 1.0
@@ -80,9 +83,9 @@ struct ZoomableImageView: View {
         }
     }
     
+    /// Validates and adjusts the image position within boundaries.
     private func validateBoundaries(size: CGSize) {
-        // Lógica para evitar que la imagen se pierda al arrastrar
-        // Si el zoom es 1, siempre reseteamos
+        // If scale is 1, always reset to center
         if scale <= 1.0 {
             resetImageState()
         }

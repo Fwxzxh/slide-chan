@@ -1,7 +1,8 @@
 import Foundation
 
-/// Representa una página del catálogo de un tablón.
-/// La API de 4chan devuelve el catálogo como un array de estas páginas.
+/// Represents a single page in a board's catalog.
+///
+/// The 4chan API returns the catalog as an array of these pages.
 struct BoardPage: Codable {
     let page: Int?
     let threads: [Post]?

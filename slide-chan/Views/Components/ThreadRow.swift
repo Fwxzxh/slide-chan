@@ -1,12 +1,13 @@
 import SwiftUI
 
+/// A row view representing a thread preview in a board catalog.
 struct ThreadRow: View {
     let post: Post
     let board: String
 
     var body: some View {
         HStack(alignment: .top, spacing: 16) {
-            // Miniatura con sombra sutil
+            // Thumbnail with subtle shadow
             ZStack(alignment: .bottomTrailing) {
                 if let thumbUrl = post.thumbnailUrl(board: board) {
                     AsyncImage(url: thumbUrl) { image in
@@ -26,7 +27,7 @@ struct ThreadRow: View {
                 }
             }
 
-            // Contenido
+            // Content
             VStack(alignment: .leading, spacing: 6) {
                 HStack(alignment: .firstTextBaseline) {
                     if let sub = post.sub, !sub.isEmpty {
@@ -44,7 +45,7 @@ struct ThreadRow: View {
 
                     Text("#\(String(post.no))")
                         .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .foregroundColor(.orange.opacity(0.8))
+                        .foregroundColor(.appSecondary.opacity(0.8))
                 }
 
                 SmartText(text: post.cleanComment, lineLimit: 2)
@@ -54,7 +55,7 @@ struct ThreadRow: View {
 
                 Spacer(minLength: 4)
 
-                // Barra de Estadísticas y Tiempo
+                // Stats and Time bar
                 HStack(spacing: 12) {
                     HStack(spacing: 12) {
                         statLabel(value: post.replies ?? 0, icon: "bubble.left.fill")
@@ -77,6 +78,7 @@ struct ThreadRow: View {
         .padding(.vertical, 12)
     }
 
+    /// Helper to create a stat label with an icon.
     private func statLabel(value: Int, icon: String) -> some View {
         HStack(spacing: 4) {
             Image(systemName: icon)

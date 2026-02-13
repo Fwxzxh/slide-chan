@@ -1,8 +1,12 @@
 import SwiftUI
 
+/// A small thumbnail view for post attachments.
 struct MediaThumbnailView: View {
+    /// The post containing the media.
     let post: Post
+    /// The short ID of the board.
     let board: String
+    /// The square dimension of the thumbnail.
     var size: CGFloat = 50
     
     var body: some View {
@@ -38,6 +42,7 @@ struct MediaThumbnailView: View {
         .cornerRadius(4)
     }
     
+    /// System icon name for the specific media type.
     private var mediaIcon: String {
         switch post.mediaType {
         case .video: return "play.fill"

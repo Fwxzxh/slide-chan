@@ -1,8 +1,9 @@
 import Foundation
 
-/// Representa un nodo en la estructura de árbol de un hilo.
-/// Se define como clase (Reference Type) para permitir la construcción del árbol
-/// de forma eficiente y evitar errores de "overlapping access" durante la mutación.
+/// Represents a node in a thread's tree structure.
+///
+/// Defined as a class (Reference Type) to allow efficient tree construction
+/// and avoid "overlapping access" errors during mutation.
 class ThreadNode: Identifiable {
     let id: Int
     let post: Post

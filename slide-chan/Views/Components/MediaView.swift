@@ -1,10 +1,15 @@
 import SwiftUI
 import WebKit
 
+/// A view that handles the display of different media types (images, videos, gifs).
 struct MediaView: View {
+    /// The post containing the media metadata.
     let post: Post
+    /// The short ID of the board.
     let board: String
+    /// Whether the media is being displayed in full-screen mode.
     var isFullScreen: Bool = false
+    
     @State private var loadError = false
     @State private var retryID = UUID()
     
@@ -19,13 +24,14 @@ struct MediaView: View {
         .id(retryID)
     }
 
+    /// Primary content view logic based on media type and display mode.
     @ViewBuilder
     private var contentView: some View {
         let ext = post.ext?.lowercased() ?? ""
         
         if post.mediaType == .image && ext != ".gif" {
             if isFullScreen {
-                // Vista con Zoom para pantalla completa
+                // Zoomable view for full-screen images
                 if let url = post.imageUrl(board: board) {
                     ZoomableImageView(url: url)
                 }
@@ -41,6 +47,7 @@ struct MediaView: View {
         }
     }
     
+    /// Standard non-interactive image view.
     private var standardImage: some View {
         AsyncImage(url: post.imageUrl(board: board)) { phase in
             switch phase {
@@ -64,6 +71,7 @@ struct MediaView: View {
         }
     }
 
+    /// UI placeholder for media loading failures.
     private var errorPlaceholder: some View {
         VStack(spacing: 16) {
             HStack(spacing: 10) {
@@ -101,8 +109,11 @@ struct MediaView: View {
     }
 }
 
+/// A lightweight web view wrapper for playing videos and GIFs.
 struct SimpleWebPlayer: UIViewRepresentable {
+    /// The URL of the media file.
     let url: URL
+    /// Whether interactive controls should be enabled.
     let isFullScreen: Bool
     
     func makeUIView(context: Context) -> WKWebView {

@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// A row view representing a single 4chan board.
 struct BoardRow: View {
     let board: Board
     let isFavorite: Bool
@@ -33,12 +34,12 @@ struct BoardRow: View {
             
             Spacer()
             
-            // Botón de favorito más discreto y accesible
+            // Discreet favorite button
             Button {
                 toggleFavorite()
             } label: {
                 Image(systemName: isFavorite ? "star.fill" : "star")
-                    .foregroundColor(isFavorite ? .blue : .secondary.opacity(0.3))
+                    .foregroundColor(isFavorite ? .appAccent : .secondary.opacity(0.3))
                     .font(.system(size: 20))
                     .frame(width: 44, height: 44)
             }
