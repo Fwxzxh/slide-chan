@@ -15,6 +15,18 @@ struct ReplyStackCard: View {
                 Text(node.post.name ?? "Anonymous")
                     .font(.caption.bold())
                     .foregroundColor(.primary)
+                
+                if node.post.hasFile, let filename = node.post.filename, let ext = node.post.ext {
+                    HStack(spacing: 2) {
+                        Image(systemName: "paperclip")
+                        Text("\(filename)\(ext)")
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    .font(.system(size: 9))
+                    .foregroundColor(.secondary)
+                }
+                
                 Spacer()
                 if !node.replies.isEmpty {
                     Text("\(node.replies.count) »")

@@ -40,9 +40,16 @@ struct MediaView: View {
             }
         } else {
             if let url = post.imageUrl(board: board) {
-                SimpleWebPlayer(url: url, isFullScreen: isFullScreen)
-                    .aspectRatio(post.aspectRatio, contentMode: .fit)
-                    .frame(maxWidth: .infinity)
+                ZStack {
+                    SimpleWebPlayer(url: url, isFullScreen: isFullScreen)
+                        .aspectRatio(post.aspectRatio, contentMode: .fit)
+                        .frame(maxWidth: .infinity)
+                    
+                    if !isFullScreen {
+                        Color.clear
+                            .contentShape(Rectangle())
+                    }
+                }
             }
         }
     }

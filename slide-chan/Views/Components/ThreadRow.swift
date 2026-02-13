@@ -34,7 +34,7 @@ struct ThreadRow: View {
                         Text(sub.decodedHTML)
                             .font(.system(size: 15, weight: .bold))
                             .foregroundColor(.primary)
-                            .lineLimit(1)
+                            .lineLimit(2)
                     } else {
                         Text("Thread")
                             .font(.system(size: 15, weight: .bold))
@@ -85,6 +85,8 @@ struct ThreadRow: View {
                 .font(.system(size: 10))
             Text("\(value)")
                 .font(.system(size: 11, weight: .bold))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
         }
         .foregroundColor(.secondary)
     }

@@ -22,7 +22,7 @@ struct BookmarkRow: View {
                     if let subject = bookmark.subject, !subject.isEmpty {
                         Text(subject)
                             .font(.subheadline.bold())
-                            .lineLimit(1)
+                            .lineLimit(2)
                     } else {
                         Text("Thread #\(String(bookmark.threadId))")
                             .font(.subheadline.bold())

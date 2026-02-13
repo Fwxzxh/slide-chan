@@ -81,31 +81,65 @@ struct ThreadDetailView: View {
 
     /// Hero area for the thread, typically showing OP media.
     private var headerArea: some View {
-        ZStack {
-            Color.black
-            MediaView(post: rootNode.post, board: board)
-                .contentShape(Rectangle())
-                .onTapGesture { openSlideshow(at: 0) }
+        GeometryReader { geometry in
+            let screenWidth = geometry.size.width
+            let imageHeight = min(screenWidth / rootNode.post.aspectRatio, 500)
+            
+            ZStack(alignment: .bottom) {
+                // 1. Background Layer (Blurred)
+                // Uses GeometryReader to fill the parent size defined by the main image
+                GeometryReader { proxy in
+                    if let thumbUrl = rootNode.post.thumbnailUrl(board: board) {
+                        AsyncImage(url: thumbUrl) { image in
+                            image.resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .blur(radius: 30)
+                                .overlay(Color.black.opacity(0.3))
+                        } placeholder: {
+                            Color.black
+                        }
+                        // Extend upwards by 200pt
+                        .frame(width: proxy.size.width, height: proxy.size.height + 200)
+                        // Position center shifted up by 100pt, so bottom edge matches parent bottom edge
+                        .position(x: proxy.size.width / 2, y: (proxy.size.height / 2) - 100)
+                    }
+                }
+                .allowsHitTesting(false)
+                // Allow this background to extend behind safe area
+                .ignoresSafeArea(edges: .top)
+                
+                // 2. Main Image Layer
+                MediaView(post: rootNode.post, board: board)
+                    .onTapGesture { openSlideshow(at: 0) }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .frame(width: screenWidth, height: imageHeight)
+            // Removed clipped() to allow the top blur to bleed into the safe area
         }
-        .frame(minHeight: 300, maxHeight: 500)
+        .aspectRatio(rootNode.post.aspectRatio, contentMode: .fit)
+        .frame(maxHeight: 500)
+        .ignoresSafeArea(edges: .top)
     }
     
     /// Main content area for the post body and metadata.
     private var contentArea: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             postMetadataView
             if let subject = rootNode.post.sub, !subject.isEmpty {
-                Text(subject.decodedHTML).font(.system(size: 24, weight: .black, design: .rounded))
+                Text(subject.decodedHTML)
+                    .font(.system(size: 20, weight: .black, design: .rounded))
+                    .lineLimit(3)
             }
             SmartText(text: rootNode.post.cleanComment, lineLimit: isAbbreviated ? 12 : nil)
-                .font(.system(.body, design: .serif)).lineSpacing(6)
+                .font(.system(.body, design: .serif)).lineSpacing(4)
             if rootNode.post.cleanComment.components(separatedBy: "\n").count > 12 {
                 readMoreButton
             }
         }
-        .padding(Theme.horizontalPadding).background(Color.cardBackground)
-        .cornerRadius(Theme.largeCornerRadius, corners: [.topLeft, .topRight])
-        .offset(y: rootNode.post.hasFile ? -20 : 0)
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 24)
+        .background(Color(UIColor.systemBackground))
     }
     
     /// Area displaying the list of replies to the current post.
@@ -121,22 +155,52 @@ struct ThreadDetailView: View {
                 }
             }
         }
-        .background(Color.mainBackground).offset(y: rootNode.post.hasFile ? -20 : 0)
+        .background(Color.mainBackground)
     }
 
     /// Horizontal view displaying poster information and post number.
     private var postMetadataView: some View {
-        HStack(alignment: .center, spacing: 10) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(rootNode.post.name ?? "Anonymous")
-                    .font(.system(size: 13, weight: .black)).foregroundColor(.blue)
-                    .padding(.horizontal, 8).padding(.vertical, 4).background(Color.blue.opacity(0.1)).cornerRadius(6)
-                Text(rootNode.post.now ?? "").font(.system(size: 11, weight: .bold)).foregroundColor(.secondary).padding(.leading, 4)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .center, spacing: 8) {
+                // Name & Date group
+                HStack(spacing: 6) {
+                    Text(rootNode.post.name ?? "Anonymous")
+                        .font(.system(size: 13, weight: .black))
+                        .foregroundColor(.blue)
+                    
+                    Text("•")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.secondary.opacity(0.5))
+                    
+                    Text(rootNode.post.now ?? "")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.secondary)
+                }
+                
+                Spacer()
+                
+                // Post ID
+                Text("#\(String(rootNode.post.no))")
+                    .font(.system(size: 11, weight: .heavy, design: .monospaced))
+                    .foregroundColor(.orange)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.orange.opacity(0.1))
+                    .cornerRadius(6)
             }
-            Spacer()
-            Text("#\(String(rootNode.post.no))")
-                .font(.system(size: 11, weight: .heavy, design: .monospaced)).foregroundColor(.orange)
-                .padding(.horizontal, 10).padding(.vertical, 5).background(Color.orange.opacity(0.15)).cornerRadius(8)
+            
+            // Filename details
+            if rootNode.post.hasFile, let filename = rootNode.post.filename, let ext = rootNode.post.ext {
+                HStack(spacing: 4) {
+                    Image(systemName: "paperclip")
+                        .font(.system(size: 10))
+                    Text("\(filename)\(ext)")
+                        .font(.system(size: 11, weight: .medium))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .foregroundColor(.secondary.opacity(0.7))
+            }
         }
     }
 
