@@ -65,7 +65,8 @@ struct ThreadRow: View {
                 }
 
                 // Comment Snippet (Preview of the post body)
-                SmartText(text: post.cleanComment, lineLimit: 2)
+                SmartText(text: post.cleanComment)
+                    .lineLimit(2)
                     .font(.system(size: 13))
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.leading)

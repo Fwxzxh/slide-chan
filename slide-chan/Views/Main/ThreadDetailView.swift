@@ -157,11 +157,13 @@ struct ThreadDetailView: View {
             }
             
             // SmartText is a custom view that handles greentext and reply links.
-            SmartText(text: rootNode.post.cleanComment, lineLimit: isAbbreviated ? 12 : nil)
-                .font(.system(.body, design: .serif)).lineSpacing(4)
+            SmartText(text: rootNode.post.cleanComment)
+                .font(.system(.body, design: .serif))
+                .lineLimit(isAbbreviated ? 12 : nil)
+                .lineSpacing(4)
             
             // "Read More" button appears if the comment is too long.
-            if rootNode.post.cleanComment.components(separatedBy: "\n").count > 12 {
+            if rootNode.post.cleanComment.count > 700 || rootNode.post.cleanComment.components(separatedBy: "\n").count > 12 {
                 readMoreButton
             }
         }
