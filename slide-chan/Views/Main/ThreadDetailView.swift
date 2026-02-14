@@ -109,44 +109,37 @@ struct ThreadDetailView: View {
 
     /// Immersive header area showing the OP media with a blurred background.
     private var headerArea: some View {
-        // GeometryReader gives us access to the size of the parent container.
-        GeometryReader { geometry in
-            let screenWidth = geometry.size.width
-            // Calculate a height that respects aspect ratio but doesn't exceed 500pt.
-            let imageHeight = min(screenWidth / rootNode.post.aspectRatio, 500)
-            
-            // ZStack (Depth Stack) layers views on top of each other.
-            ZStack(alignment: .bottom) {
-                // Layer 1: Blurred Background (Immersive effect)
+        ZStack(alignment: .bottom) {
+            // 1. Background Layer (Blurred)
+            // This layer is forced to fill the entire horizontal space.
+            if let thumbUrl = rootNode.post.thumbnailUrl(board: board) {
                 GeometryReader { proxy in
-                    if let thumbUrl = rootNode.post.thumbnailUrl(board: board) {
-                        AsyncImage(url: thumbUrl) { image in
-                            image.resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .blur(radius: 30) // Soft blur
-                                .overlay(Color.black.opacity(0.3)) // Slight darken
-                        } placeholder: {
-                            Color.black
-                        }
-                        // Oversized background to cover safe areas during scroll bounce.
-                        .frame(width: proxy.size.width, height: proxy.size.height + 200)
-                        .position(x: proxy.size.width / 2, y: (proxy.size.height / 2) - 100)
+                    AsyncImage(url: thumbUrl) { image in
+                        image.resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .blur(radius: 30)
+                            .overlay(Color.black.opacity(0.3))
+                    } placeholder: {
+                        Color.black
                     }
+                    // We use proxy.size to ensure it fills the width regardless of content aspect.
+                    .frame(width: proxy.size.width, height: proxy.size.height + 200)
+                    .position(x: proxy.size.width / 2, y: (proxy.size.height / 2) - 100)
                 }
-                .allowsHitTesting(false) // Clicks pass through to the main image
-                .ignoresSafeArea(edges: .top) // Extends behind the notch/status bar
-                
-                // Layer 2: Main Media (High resolution image or video)
-                MediaView(post: rootNode.post, board: board)
-                    .onTapGesture { openSlideshow(at: 0) }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .allowsHitTesting(false)
+                .ignoresSafeArea(edges: .top)
             }
-            // Explicitly set the frame of the stack to the calculated height.
-            .frame(width: screenWidth, height: imageHeight)
+            
+            // 2. Main Media Layer
+            // This layer dictates the height of the ZStack but its width is centered.
+            MediaView(post: rootNode.post, board: board)
+                .onTapGesture { openSlideshow(at: 0) }
+                .aspectRatio(rootNode.post.aspectRatio, contentMode: .fit)
+                .frame(maxWidth: .infinity)
+                .frame(maxHeight: 500)
         }
-        // Use aspect ratio to ensure the GeometryReader itself takes up the right amount of space.
-        .aspectRatio(rootNode.post.aspectRatio, contentMode: .fit)
-        .frame(maxHeight: 500)
+        // Ensure the entire ZStack container always spans the full screen width.
+        .frame(maxWidth: .infinity)
         .ignoresSafeArea(edges: .top)
     }
     
