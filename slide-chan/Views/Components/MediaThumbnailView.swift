@@ -1,48 +1,58 @@
 import SwiftUI
 
-/// A small thumbnail view for post attachments.
+/// A small, square preview view used in lists (like thread rows or reply cards).
+/// It shows a thumbnail of the post's attachment and a small icon if it's a video.
 struct MediaThumbnailView: View {
-    /// The post containing the media.
+    // MARK: - Properties
+    
+    /// The post whose media thumbnail we want to display.
     let post: Post
-    /// The short ID of the board.
+    /// Short board ID (e.g., "v").
     let board: String
-    /// The square dimension of the thumbnail.
+    /// The width and height of the square thumbnail.
     var size: CGFloat = 50
     
     var body: some View {
+        // ZStack layers the image and the optional media icon.
         ZStack(alignment: .bottomTrailing) {
+            
+            // 1. Thumbnail Image
             AsyncImage(url: post.thumbnailUrl(board: board)) { phase in
                 switch phase {
                 case .success(let image):
                     image.resizable()
-                        .aspectRatio(contentMode: .fill)
+                        .aspectRatio(contentMode: .fill) // Fills the square without distorting
                 case .failure(_):
+                    // Error state icon
                     Color.gray.opacity(0.2)
                         .overlay(Image(systemName: "photo").foregroundColor(.secondary))
                 case .empty:
+                    // Grey background while loading
                     Color.secondary.opacity(0.05)
                 @unknown default:
                     EmptyView()
                 }
             }
             .frame(width: size, height: size)
-            .clipped()
+            .clipped() // Ensures parts of the image that spill out of the square are hidden
             
-            // Icon to indicate type of media if it's not a plain image
+            // 2. Media Type Icon (e.g., Play button for videos)
             if post.mediaType != .image {
                 Image(systemName: mediaIcon)
                     .font(.system(size: 8, weight: .bold))
                     .padding(2)
-                    .background(.ultraThinMaterial)
-                    .cornerRadius(2)
+                    .background(.ultraThinMaterial) // Blurry glass effect background
+                    .cornerRadius(Theme.radiusXS / 2)
                     .padding(2)
             }
         }
         .frame(width: size, height: size)
-        .cornerRadius(4)
+        .cornerRadius(Theme.radiusXS)
     }
     
-    /// System icon name for the specific media type.
+    // MARK: - Helpers
+
+    /// Decides which SF Symbol icon to show based on the file type.
     private var mediaIcon: String {
         switch post.mediaType {
         case .video: return "play.fill"
@@ -51,4 +61,12 @@ struct MediaThumbnailView: View {
         default: return ""
         }
     }
+}
+
+#Preview {
+    HStack {
+        MediaThumbnailView(post: .mock, board: "v")
+        MediaThumbnailView(post: .mock, board: "v", size: 100)
+    }
+    .padding()
 }

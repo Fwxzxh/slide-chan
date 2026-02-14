@@ -14,10 +14,19 @@ extension Color {
 
 /// Shared UI constants for consistent spacing and styling.
 struct Theme {
-    /// Standard corner radius for cards and containers.
-    static let cornerRadius: CGFloat = 12
-    /// Large corner radius for hero elements and modals.
-    static let largeCornerRadius: CGFloat = 20
+    // MARK: - Corner Radii
+    
+    /// Smallest radius for badges and minor tags.
+    static let radiusXS: CGFloat = 4
+    /// Standard radius for thumbnails and nested components.
+    static let radiusSmall: CGFloat = 8
+    /// Standard radius for cards, rows, and primary containers.
+    static let radiusMedium: CGFloat = 12
+    /// Large radius for hero sections, modals, and major surfaces.
+    static let radiusLarge: CGFloat = 20
+    
+    // MARK: - Spacing
+    
     /// Standard horizontal padding for views.
     static let horizontalPadding: CGFloat = 24
 }

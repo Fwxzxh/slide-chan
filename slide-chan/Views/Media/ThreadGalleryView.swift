@@ -1,17 +1,24 @@
 import SwiftUI
 
-/// A gallery view displaying all media files within a thread.
+/// A vertically scrolling feed that displays all images and videos found in a specific thread.
+/// It provides context for each file, such as the post ID and the number of replies.
 struct ThreadGalleryView: View {
-    /// List of all nodes in the thread.
+    // MARK: - Properties
+    
+    /// The flattened tree of all nodes in the thread.
     let nodes: [ThreadNode]
-    /// The short ID of the board.
+    /// Short board ID (e.g., "v").
     let board: String
+    
     @Environment(\.dismiss) private var dismiss
+    
+    /// Logic for infinite scrolling: how many items are currently rendered.
     @State private var visibleItemsCount = 15
+    /// Tracking for the modal full-screen slideshow.
     @State private var selectedIndex = 0
     @State private var showSlideshow = false
     
-    /// Filters nodes to only include unique posts with file attachments.
+    /// Computes a flat list of unique posts that actually contain media.
     private var mediaNodes: [ThreadNode] {
         var seen = Set<Int>()
         var unique: [ThreadNode] = []
@@ -26,14 +33,18 @@ struct ThreadGalleryView: View {
     
     var body: some View {
         ScrollView {
+            // LazyVStack only renders items as they are scrolled into view, saving memory.
             LazyVStack(spacing: 40) {
+                // Header showing total count
                 Text("\(mediaNodes.count) media files")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .padding(.top)
 
+                // The main feed of media items
                 contentStream
                 
+                // Show a spinner at the bottom if there are more items to load
                 if visibleItemsCount < mediaNodes.count {
                     ProgressView()
                         .padding(.vertical, 40)
@@ -44,6 +55,7 @@ struct ThreadGalleryView: View {
         .navigationTitle("Gallery")
         .navigationBarTitleDisplayMode(.large)
         .fullScreenCover(isPresented: $showSlideshow) {
+            // Reuses the same FullScreenMediaView as the thread detail.
             FullScreenMediaView(
                 allMediaPosts: mediaNodes.map { $0.post },
                 board: board,
@@ -52,20 +64,27 @@ struct ThreadGalleryView: View {
         }
     }
     
-    /// Stream of media views with context metadata.
+    // MARK: - View Components
+
+    /// Iterates through the media list and builds the UI for each item.
     private var contentStream: some View {
         ForEach(Array(mediaNodes.prefix(visibleItemsCount).enumerated()), id: \.element.post.no) { index, node in
             VStack(alignment: .leading, spacing: 16) {
+                
+                // 1. Large Media Preview
                 MediaView(post: node.post, board: board)
-                    .cornerRadius(12)
+                    .cornerRadius(Theme.radiusMedium)
                     .contentShape(Rectangle())
                     .onTapGesture {
+                        // Tapping the image opens the slideshow at the correct index.
                         self.selectedIndex = index
                         self.showSlideshow = true
                     }
                 
+                // 2. File and Context Metadata
                 VStack(alignment: .leading, spacing: 12) {
                     HStack {
+                        // Display filename (e.g., sample.jpg)
                         if let filename = node.post.filename {
                             Text(filename + (node.post.ext ?? ""))
                                 .font(.caption.monospaced())
@@ -74,6 +93,7 @@ struct ThreadGalleryView: View {
                         }
                         Spacer()
                         
+                        // Badge showing how many people replied to this specific post.
                         if node.replies.count > 0 {
                             HStack(spacing: 4) {
                                 Image(systemName: "bubble.left.fill")
@@ -84,10 +104,11 @@ struct ThreadGalleryView: View {
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
                             .background(Color.teal.opacity(0.15))
-                            .cornerRadius(6)
+                            .cornerRadius(Theme.radiusSmall)
                         }
                     }
                     
+                    // 3. Navigation Link to view the post in its original thread location.
                     HStack(spacing: 12) {
                         NavigationLink(destination: ThreadDetailView(board: board, rootNode: node, depth: 1, onRefresh: nil)) {
                             Label("View Context", systemImage: "arrow.right.circle")
@@ -103,6 +124,7 @@ struct ThreadGalleryView: View {
             }
             .padding(.horizontal, 20)
             .onAppear {
+                // When the last visible item appears, load the next batch of 15.
                 if index == visibleItemsCount - 1 {
                     loadMore()
                 }
@@ -110,7 +132,9 @@ struct ThreadGalleryView: View {
         }
     }
     
-    /// Increases the number of visible items (infinite scroll).
+    // MARK: - Logic
+
+    /// Increases the number of visible items (infinite scroll implementation).
     private func loadMore() {
         if visibleItemsCount < mediaNodes.count {
             visibleItemsCount += 15

@@ -1,37 +1,51 @@
 import SwiftUI
 import WebKit
 
-/// A view that handles the display of different media types (images, videos, gifs).
+/// The central media player component for Slide-chan.
+/// It intelligently decides whether to use a native image view or a web-based video player
+/// based on the file extension (JPG, PNG, GIF, WEBM, MP4).
 struct MediaView: View {
-    /// The post containing the media metadata.
+    // MARK: - Properties
+    
+    /// The post containing the media details (URL, dimensions, etc).
     let post: Post
-    /// The short ID of the board.
+    /// Short board ID (e.g., "a").
     let board: String
-    /// Whether the media is being displayed in full-screen mode.
+    /// When true, enables zooming for images and controls for videos.
     var isFullScreen: Bool = false
     
+    /// Internal state to track if a download failed.
     @State private var loadError = false
+    /// Used to force a view refresh when retrying a connection.
     @State private var retryID = UUID()
     
     var body: some View {
         Group {
             if loadError {
+                // UI shown when media fails to load.
                 errorPlaceholder
             } else {
+                // The actual media content.
                 contentView
             }
         }
-        .id(retryID)
+        .id(retryID) // Changing this ID forces SwiftUI to re-create the view.
     }
 
-    /// Primary content view logic based on media type and display mode.
+    // MARK: - Content Logic
+
+    /// Main logic for choosing the right sub-view for the media type.
     @ViewBuilder
     private var contentView: some View {
         let ext = post.ext?.lowercased() ?? ""
         
+        // Strategy: 
+        // 1. Static Images (JPG, PNG) use native SwiftUI AsyncImage.
+        // 2. Animated/Complex Media (GIF, WEBM, MP4) use a WKWebView wrapper.
+        
         if post.mediaType == .image && ext != ".gif" {
             if isFullScreen {
-                // Zoomable view for full-screen images
+                // Custom zoomable view implementation.
                 if let url = post.imageUrl(board: board) {
                     ZoomableImageView(url: url)
                 }
@@ -39,12 +53,16 @@ struct MediaView: View {
                 standardImage
             }
         } else {
+            // Video/GIF path:
             if let url = post.imageUrl(board: board) {
                 ZStack {
+                    // SimpleWebPlayer uses a hidden web view to render 4chan's webm/gifs.
                     SimpleWebPlayer(url: url, isFullScreen: isFullScreen)
                         .aspectRatio(post.aspectRatio, contentMode: .fit)
                         .frame(maxWidth: .infinity)
                     
+                    // If not full screen, we place a transparent layer on top to catch taps.
+                    // This is necessary because WKWebView often "steals" touch events.
                     if !isFullScreen {
                         Color.clear
                             .contentShape(Rectangle())
@@ -54,7 +72,9 @@ struct MediaView: View {
         }
     }
     
-    /// Standard non-interactive image view.
+    // MARK: - Sub-Components
+
+    /// Native image component with loading and failure handling.
     private var standardImage: some View {
         AsyncImage(url: post.imageUrl(board: board)) { phase in
             switch phase {
@@ -64,8 +84,10 @@ struct MediaView: View {
                     .frame(maxWidth: .infinity)
                     .onAppear { loadError = false }
             case .failure(_):
+                // Trigger the error UI if download fails.
                 Color.clear.onAppear { loadError = true }
             case .empty:
+                // Loading state.
                 ZStack {
                     Color.secondary.opacity(0.05)
                     ProgressView()
@@ -78,7 +100,7 @@ struct MediaView: View {
         }
     }
 
-    /// UI placeholder for media loading failures.
+    /// Error UI with a retry button for failed connections.
     private var errorPlaceholder: some View {
         VStack(spacing: 16) {
             HStack(spacing: 10) {
@@ -91,12 +113,12 @@ struct MediaView: View {
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity)
             .background(.ultraThinMaterial)
-            .cornerRadius(12)
+            .cornerRadius(Theme.radiusMedium)
             .padding(.horizontal, 20)
             
             Button {
                 loadError = false
-                retryID = UUID()
+                retryID = UUID() // Triggers re-render.
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.clockwise")
@@ -107,7 +129,7 @@ struct MediaView: View {
                 .padding(.horizontal, 24)
                 .padding(.vertical, 12)
                 .background(Color.blue)
-                .cornerRadius(25)
+                .cornerRadius(Theme.radiusLarge)
                 .shadow(color: .blue.opacity(0.3), radius: 10)
             }
         }
@@ -116,31 +138,37 @@ struct MediaView: View {
     }
 }
 
-/// A lightweight web view wrapper for playing videos and GIFs.
+// MARK: - WKWebView Wrapper
+
+/// A wrapper that makes UIKit's WKWebView compatible with SwiftUI.
+/// Used for rendering webm and mp4 files natively since SwiftUI's VideoPlayer
+/// has limited support for certain web formats.
 struct SimpleWebPlayer: UIViewRepresentable {
-    /// The URL of the media file.
     let url: URL
-    /// Whether interactive controls should be enabled.
     let isFullScreen: Bool
     
+    /// Creates the actual UIKit view.
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
-        config.allowsInlineMediaPlayback = true
+        config.allowsInlineMediaPlayback = true // Plays inside the view, not full screen by default.
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.backgroundColor = .black
-        webView.scrollView.isScrollEnabled = false
-        webView.isUserInteractionEnabled = isFullScreen
+        webView.scrollView.isScrollEnabled = false // Prevent accidental scrolling inside the player.
+        webView.isUserInteractionEnabled = isFullScreen // Only allow controls in full screen.
         return webView
     }
     
+    /// Updates the view whenever the state changes.
     func updateUIView(_ uiView: WKWebView, context: Context) {
         let isGif = url.pathExtension.lowercased() == "gif"
+        // HTML video attributes: loop, autoplay, and muted (muted is required for autoplay in web views).
         let videoAttrs = isFullScreen ? "playsinline loop autoplay controls" : "playsinline loop autoplay muted"
         
         let mediaTag = isGif ? 
             "<img src=\"\(url.absoluteString)\" style=\"width:100%;height:100%;object-fit:contain;\">" :
             "<video \(videoAttrs) style=\"width:100%;height:100%;object-fit:contain;\"><source src=\"\(url.absoluteString)\"></video>"
             
+        // Inject a simple HTML wrapper to ensure the media is centered and covers the view.
         let html = """
         <html>
         <head>
@@ -153,5 +181,19 @@ struct SimpleWebPlayer: UIViewRepresentable {
         </html>
         """
         uiView.loadHTMLString(html, baseURL: url)
+    }
+}
+
+#Preview {
+    ScrollView {
+        VStack(spacing: 20) {
+            Text("Standard Image")
+            MediaView(post: .mock, board: "v")
+                .frame(height: 300)
+            
+            Text("Full Screen Mode")
+            MediaView(post: .mock, board: "v", isFullScreen: true)
+                .frame(height: 300)
+        }
     }
 }
