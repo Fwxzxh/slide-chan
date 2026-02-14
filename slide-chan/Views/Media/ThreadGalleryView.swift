@@ -141,3 +141,18 @@ struct ThreadGalleryView: View {
         }
     }
 }
+
+#Preview {
+    NavigationStack {
+        ThreadGalleryView(
+            nodes: [
+                .mock,
+                ThreadNode(post: .mockNoSubject),
+                ThreadNode(post: .mockManyStats),
+                .mockLong,
+                .mockLongFile
+            ],
+            board: "preview"
+        )
+    }
+}

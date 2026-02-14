@@ -5,110 +5,255 @@ import UIKit
 /// It supports swiping between multiple media items, sharing, and copying links.
 struct FullScreenMediaView: View {
     // MARK: - Properties
-    
+
     /// The collection of all media-containing posts in the current thread or branch.
     let allMediaPosts: [Post]
     /// Short board ID (e.g., "v").
     let board: String
     /// A binding to the index currently being viewed, allowing the parent to track progress.
     @Binding var currentIndex: Int
-    
+
     /// Standard environment variable to close the view.
     @Environment(\.dismiss) private var dismiss
+    /// Haptic feedback during drag.
+    @State private var hasTriggeredHaptic = false
     /// Controls the visibility of the toolbar and page counter.
     @State private var showControls = true
-    
+    /// Current vertical drag offset for swipe-to-dismiss.
+    @State private var dragOffset: CGSize = .zero
+    /// Status message for save operations.
+    @State private var toastMessage: String?
+
+    /// Scale factor for swipe-to-dismiss animation.
+    private var dragScale: CGFloat {
+        let maxDrag = 300.0
+        let currentDrag = abs(dragOffset.height)
+        return max(0.8, 1.0 - (currentDrag / maxDrag) * 0.2)
+    }
+
     var body: some View {
-        ZStack {
-            // Solid black background for cinematic viewing.
-            Color.black.ignoresSafeArea()
-            
-            // TabView with .page style creates the "swipeable" horizontal gallery effect.
-            TabView(selection: $currentIndex) {
-                ForEach(allMediaPosts.indices, id: \.self) { index in
-                    // Reuse MediaView with isFullScreen enabled for interactive content.
-                    MediaView(post: allMediaPosts[index], board: board, isFullScreen: true)
-                        .tag(index) // Necessary for TabView selection tracking.
-                        .onTapGesture {
-                            // Single tap toggles the UI overlay (toolbar and counter).
-                            withAnimation { showControls.toggle() }
+        NavigationStack {
+            ZStack {
+                // Modern paging carousel using ScrollView (iOS 17+)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 0) {
+                        ForEach(allMediaPosts.indices, id: \.self) { index in
+                            MediaView(post: allMediaPosts[index], board: board, isFullScreen: true)
+                                .containerRelativeFrame(.horizontal) // Forces each page to be exactly screen width
+                                .id(index)
+                                .onTapGesture {
+                                    withAnimation(.easeInOut(duration: 0.2)) { showControls.toggle() }
+                                }
                         }
+                    }
+                    .scrollTargetLayout()
                 }
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never)) // Hides native page dots.
-            .ignoresSafeArea()
-            
-            // Floating UI Overlay (Header toolbar and Footer counter)
-            if showControls {
-                VStack {
-                    // 1. Top Navigation Bar
-                    HStack {
-                        // Close button
-                        Button(action: { dismiss() }) {
-                            Image(systemName: "xmark")
-                        }
-                        
+                .scrollTargetBehavior(.paging) // Mimics TabView paging but more efficiently
+                .scrollPosition(id: Binding(
+                    get: { currentIndex },
+                    set: { if let val = $0 { currentIndex = val } }
+                ))
+                .ignoresSafeArea()
+
+                // Toast overlay
+                if let toast = toastMessage {
+                    VStack {
                         Spacer()
-                        
-                        // Display the current file name.
+                        Text(toast)
+                            .font(.system(size: 14, weight: .medium))
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 10)
+                            .glassEffect()
+                        Spacer()
+                    }
+                    .zIndex(2)
+                }
+
+                // Manual Bottom Bar Overlay (to avoid UIKitToolbar errors)
+                VStack {
+                    Spacer()
+                    HStack {
                         if let filename = allMediaPosts[currentIndex].filename {
                             Text(filename + (allMediaPosts[currentIndex].ext ?? ""))
-                                .font(.caption.bold())
+                                .font(.system(size: 13, weight: .medium, design: .rounded))
                                 .lineLimit(1)
                                 .truncationMode(.middle)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 12)
+                                .glassEffect()
                         }
-
+                        
                         Spacer()
                         
-                        // Action buttons: Copy link and Share.
-                        HStack(spacing: 20) {
-                            Button(action: copyImageLink) {
-                                Image(systemName: "link")
+                        Text("\(currentIndex + 1) / \(allMediaPosts.count)")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 12)
+                            .glassEffect()
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 20) 
+                }
+                .opacity(showControls ? 1 : 0)
+                .allowsHitTesting(false)
+            }
+            .background(Color.black.ignoresSafeArea())
+            .opacity(dragOffset == .zero ? 1.0 : Double(dragScale))
+            .scaleEffect(dragScale)
+            .offset(dragOffset)
+            .ignoresSafeArea()
+            .gesture(
+                DragGesture()
+                    .onChanged { gesture in
+                        if abs(gesture.translation.height) > abs(gesture.translation.width) {
+                            dragOffset = gesture.translation
+
+                            if abs(dragOffset.height) > 150 && !hasTriggeredHaptic {
+                                HapticManager.impact(style: .medium)
+                                hasTriggeredHaptic = true
+                            } else if abs(dragOffset.height) < 150 {
+                                hasTriggeredHaptic = false
                             }
-                            Button(action: shareMedia) {
-                                Image(systemName: "square.and.arrow.up")
+
+                            if showControls {
+                                withAnimation { showControls = false }
                             }
                         }
                     }
-                    .padding()
-                    .background(.ultraThinMaterial) // Translucent blurred background
-                    
-                    Spacer() // Pushes the counter to the bottom
-                    
-                    // 2. Page Counter (e.g., "5 / 20")
-                    Text("\(currentIndex + 1) / \(allMediaPosts.count)")
-                        .font(.caption.bold())
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(.ultraThinMaterial)
-                        .clipShape(Capsule())
-                        .padding(.bottom, 20)
+                    .onEnded { gesture in
+                        if abs(dragOffset.height) > 150 {
+                            HapticManager.impact(style: .light)
+                            dismiss()
+                        } else {
+                            withAnimation(.interactiveSpring()) {
+                                dragOffset = .zero
+                            }
+                        }
+                    }
+            )
+            .toolbar(showControls ? .visible : .hidden, for: .navigationBar)
+            .toolbarBackground(.hidden, for: .navigationBar)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                // Top Leading
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.body.bold())
+                    }
+                }
+
+                // Top Trailing
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    HStack(spacing: 20)  {
+                        Button {
+                            copyImageLink()
+                        } label: {
+                            Image(systemName: "link")
+                        }
+
+                        Button {
+                            saveMedia()
+                        } label: {
+                            Image(systemName: "square.and.arrow.down")
+                        }
+
+                        Button {
+                            shareMedia()
+                        } label: {
+                            Image(systemName: "square.and.arrow.up")
+                        }
+                    }
+                    .padding(8)
                 }
             }
         }
     }
-    
+
+
+
     // MARK: - Actions
 
-    /// Copies the direct image/video URL to the device clipboard.
     private func copyImageLink() {
         if let url = allMediaPosts[currentIndex].imageUrl(board: board) {
             UIPasteboard.general.url = url
+            HapticManager.notification(type: .success)
+            showToast("Link copied!")
         }
     }
-    
-    /// Triggers the native iOS system share sheet.
+
+    private func saveMedia() {
+        guard let url = allMediaPosts[currentIndex].imageUrl(board: board) else { return }
+        let isVideo = allMediaPosts[currentIndex].ext == ".webm" || allMediaPosts[currentIndex].ext == ".mp4"
+
+        HapticManager.impact(style: .medium)
+        showToast("Saving...")
+
+        MediaSaver.shared.downloadAndSaveMedia(url: url, isVideo: isVideo) { success, error in
+            if success {
+                HapticManager.notification(type: .success)
+                showToast("Saved to Photos!")
+            } else {
+                HapticManager.notification(type: .error)
+                showToast("Failed to save.")
+                print("Save error: \(error?.localizedDescription ?? "unknown")")
+            }
+        }
+    }
+
     private func shareMedia() {
         guard let url = allMediaPosts[currentIndex].imageUrl(board: board) else { return }
-        let av = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-        
-        // UIKit bridge to find the current active window for presenting the share sheet.
-        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let rootVC = scene.windows.first?.rootViewController {
-            if let popoverController = av.popoverPresentationController {
-                popoverController.sourceView = rootVC.view // Required for iPad compatibility.
+        HapticManager.impact(style: .light)
+
+        URLSession.shared.dataTask(with: url) { data, _, _ in
+            let activityItems: [Any] = data.flatMap { [UIImage(data: $0) as Any] } ?? [url]
+
+            DispatchQueue.main.async {
+                let av = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+
+                if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                   let window = scene.windows.first(where: { $0.isKeyWindow }) {
+
+                    var topVC = window.rootViewController
+                    while let presented = topVC?.presentedViewController {
+                        topVC = presented
+                    }
+
+                    if let popoverController = av.popoverPresentationController {
+                        popoverController.sourceView = topVC?.view
+                    }
+
+                    topVC?.present(av, animated: true)
+                }
             }
-            rootVC.present(av, animated: true)
+        }.resume()
+    }
+
+    private func showToast(_ message: String) {
+        withAnimation {
+            toastMessage = message
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation {
+                if toastMessage == message {
+                    toastMessage = nil
+                }
+            }
         }
     }
+}
+
+#Preview {
+    FullScreenMediaView(
+        allMediaPosts: [
+            .mock,
+            .mockNoSubject,
+            .mockManyStats
+        ],
+        board: "preview",
+        currentIndex: .constant(0)
+    )
 }

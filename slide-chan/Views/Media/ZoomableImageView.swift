@@ -18,6 +18,8 @@ struct ZoomableImageView: View {
     @State private var offset: CGSize = .zero
     /// Tracking the offset from the previous gesture update.
     @State private var lastOffset: CGSize = .zero
+    /// The anchor point for zooming.
+    @State private var zoomAnchor: UnitPoint = .center
     
     var body: some View {
         GeometryReader { geometry in
@@ -28,90 +30,126 @@ struct ZoomableImageView: View {
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .scaleEffect(scale) // Apply zoom level
+                        .scaleEffect(scale, anchor: zoomAnchor) // Apply zoom level with anchor
                         .offset(offset)     // Apply panning position
                         
                         // 1. Pinch-to-Zoom Gesture (Magnification)
                         .gesture(
                             MagnificationGesture()
                                 .onChanged { value in
-                                    // Calculate how much the pinch distance has changed.
                                     let delta = value / lastScale
                                     lastScale = value
                                     let newScale = scale * delta
-                                    // Clamp the zoom between 1x and 5x.
-                                    scale = min(max(newScale, 1.0), 5.0)
+                                    
+                                    // Provide haptic feedback at limits
+                                    if (newScale >= 5.0 && scale < 5.0) || (newScale <= 1.0 && scale > 1.0) {
+                                        HapticManager.impact(style: .light)
+                                    }
+                                    
+                                    withAnimation(.interactiveSpring()) {
+                                        scale = min(max(newScale, 0.8), 6.0) // Allow slightly more/less for rubber banding
+                                    }
                                 }
                                 .onEnded { _ in
-                                    // Reset state for the next gesture.
                                     lastScale = 1.0
-                                    if scale <= 1.0 {
-                                        resetImageState()
+                                    withAnimation(.spring()) {
+                                        if scale < 1.0 {
+                                            resetImageState()
+                                        } else if scale > 5.0 {
+                                            scale = 5.0
+                                        }
                                     }
                                 }
                         )
                         
-                        // 2. Drag Gesture (Panning)
-                        // Only enabled if the image is actually zoomed in.
-                        .gesture(
+                        // 2. Drag Gesture (Panning) - Use highPriorityGesture to beat parent/TabView gestures when zoomed
+                        .highPriorityGesture(
                             scale > 1.0 ? 
-                            DragGesture()
+                            DragGesture(minimumDistance: 10) // Small distance to allow double tap recognition
                                 .onChanged { value in
-                                    // Move the image based on the finger displacement.
-                                    let newWidth = lastOffset.width + value.translation.width
-                                    let newHeight = lastOffset.height + value.translation.height
-                                    offset = CGSize(width: newWidth, height: newHeight)
+                                    // Calculate movement relative to the last confirmed position
+                                    let deltaW = value.translation.width - lastOffset.width
+                                    let deltaH = value.translation.height - lastOffset.height
+                                    
+                                    // We use a small animation to keep it fluid
+                                    withAnimation(.interactiveSpring()) {
+                                        offset.width += deltaW
+                                        offset.height += deltaH
+                                    }
+                                    
+                                    lastOffset = value.translation
                                 }
                                 .onEnded { _ in
-                                    // Save the final position and ensure it's not out of bounds.
-                                    lastOffset = offset
-                                    validateBoundaries(size: geometry.size)
+                                    // Reset the tracker for the next gesture session
+                                    lastOffset = .zero
+                                    
+                                    withAnimation(.interactiveSpring()) {
+                                        validateBoundaries(size: geometry.size)
+                                    }
                                 }
-                            : nil // Disable if not zoomed.
+                            : nil
                         )
                         
-                        // 3. Double-Tap Shortcut
-                        // Instantly toggles between 1x and 3x zoom.
-                        .onTapGesture(count: 2) {
-                            withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) {
-                                if scale > 1.0 {
-                                    resetImageState()
-                                } else {
-                                    scale = 3.0
+                        // 3. Double-Tap Shortcut - Also use highPriority to ensure it works when zoomed
+                        .highPriorityGesture(
+                            SpatialTapGesture(count: 2)
+                                .onEnded { event in
+                                    let location = event.location
+                                    HapticManager.selection()
+                                    withAnimation(.spring(response: 0.45, dampingFraction: 0.75)) {
+                                        if scale > 1.05 {
+                                            resetImageState()
+                                        } else {
+                                            // Zoom into the tapped area
+                                            zoomAnchor = UnitPoint(
+                                                x: location.x / geometry.size.width,
+                                                y: location.y / geometry.size.height
+                                            )
+                                            scale = 3.0
+                                        }
+                                    }
                                 }
-                            }
-                        }
+                        )
+
                 case .failure(_):
-                    // Empty or error state if the image fails to load.
                     Color.clear
                 case .empty:
-                    // Loading indicator.
                     ProgressView()
                 @unknown default:
                     EmptyView()
                 }
             }
-            // Ensure the image container fills the entire screen.
             .frame(width: geometry.size.width, height: geometry.size.height)
+            .clipped() // Ensure zoomed image doesn't spill over
         }
+        .ignoresSafeArea()
     }
     
     // MARK: - Logic
 
-    /// Animates the image back to its original centered position at 1x scale.
     private func resetImageState() {
-        withAnimation(.spring()) {
-            scale = 1.0
-            offset = .zero
-            lastOffset = .zero
-        }
+        scale = 1.0
+        offset = .zero
+        lastOffset = .zero
+        zoomAnchor = .center
     }
     
-    /// Ensures that the image panning doesn't leave the screen edges empty (boundary control).
     private func validateBoundaries(size: CGSize) {
-        if scale <= 1.0 {
-            resetImageState()
-        }
-        // Future implementation: Logic to snap edges back to screen bounds.
+        // Simple boundary clamping
+        let maxX = (size.width * (scale - 1)) / 2
+        let maxY = (size.height * (scale - 1)) / 2
+        
+        var newOffset = offset
+        
+        if offset.width > maxX { newOffset.width = maxX }
+        if offset.width < -maxX { newOffset.width = -maxX }
+        if offset.height > maxY { newOffset.height = maxY }
+        if offset.height < -maxY { newOffset.height = -maxY }
+        
+        offset = newOffset
     }
+}
+
+#Preview {
+    ZoomableImageView(url: URL(string: "https://picsum.photos/1000/1500")!)
 }

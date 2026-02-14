@@ -110,12 +110,21 @@ struct Post: Codable, Identifiable {
 
     /// Generates the URL for the original image.
     func imageUrl(board: String) -> URL? {
+        // Special case for previews/testing to show functional images
+        if board == "preview" {
+            let seed = (tim ?? Int64(no)) % 1000
+            return URL(string: "https://picsum.photos/seed/\(seed)/1200/1600")
+        }
         guard let tim = tim, let ext = ext else { return nil }
         return APIConstants.imageUrl(board: board, tim: tim, ext: ext)
     }
 
     /// Generates the URL for the thumbnail image.
     func thumbnailUrl(board: String) -> URL? {
+        if board == "preview" {
+            let seed = (tim ?? Int64(no)) % 1000
+            return URL(string: "https://picsum.photos/seed/\(seed)/200/200")
+        }
         if isSpoiler {
             return APIConstants.spoilerThumbnailURL
         }

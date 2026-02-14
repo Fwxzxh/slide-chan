@@ -6,7 +6,7 @@ This document provides essential information for AI agents working on the Slide-
 
 ### Prerequisites
 - Xcode 15+
-- iOS 17.0+ deployment target
+- iOS 18.0+ deployment target
 - `xcode-build-server` (optional, for LSP)
 
 ### Common Commands
@@ -88,7 +88,6 @@ The app interacts with the 4chan JSON API.
 When adding new API endpoints, update `APIService.swift` and follow the `fetch<T>` pattern.
 
 ## 5. View Component Guidelines
-- **GlassStyles.swift**: Contains custom modifiers for the "glassmorphism" look.
 - **SmartText.swift**: Used for rendering post content with greentext and reply link detection. Use this instead of standard `Text` for comments.
 - **MediaView.swift**: The central component for displaying images and videos.
 

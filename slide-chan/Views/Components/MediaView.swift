@@ -30,6 +30,7 @@ struct MediaView: View {
             }
         }
         .id(retryID) // Changing this ID forces SwiftUI to re-create the view.
+        .ignoresSafeArea(isFullScreen ? .all : [])
     }
 
     // MARK: - Content Logic
@@ -38,6 +39,7 @@ struct MediaView: View {
     @ViewBuilder
     private var contentView: some View {
         let ext = post.ext?.lowercased() ?? ""
+        let url = post.imageUrl(board: board)
         
         // Strategy: 
         // 1. Static Images (JPG, PNG) use native SwiftUI AsyncImage.
@@ -46,15 +48,15 @@ struct MediaView: View {
         if post.mediaType == .image && ext != ".gif" {
             if isFullScreen {
                 // Custom zoomable view implementation.
-                if let url = post.imageUrl(board: board) {
+                if let url = url {
                     ZoomableImageView(url: url)
                 }
             } else {
-                standardImage
+                standardImage(url: url)
             }
         } else {
             // Video/GIF path:
-            if let url = post.imageUrl(board: board) {
+            if let url = url {
                 ZStack {
                     // SimpleWebPlayer uses a hidden web view to render 4chan's webm/gifs.
                     SimpleWebPlayer(url: url, isFullScreen: isFullScreen)
@@ -75,8 +77,8 @@ struct MediaView: View {
     // MARK: - Sub-Components
 
     /// Native image component with loading and failure handling.
-    private var standardImage: some View {
-        AsyncImage(url: post.imageUrl(board: board)) { phase in
+    private func standardImage(url: URL?) -> some View {
+        AsyncImage(url: url) { phase in
             switch phase {
             case .success(let image):
                 image.resizable()
@@ -188,12 +190,26 @@ struct SimpleWebPlayer: UIViewRepresentable {
     ScrollView {
         VStack(spacing: 20) {
             Text("Standard Image")
-            MediaView(post: .mock, board: "v")
-                .frame(height: 300)
+            MediaView(
+                post: .mock,
+                board: "preview"
+            )
+            .frame(height: 300)
             
             Text("Full Screen Mode")
-            MediaView(post: .mock, board: "v", isFullScreen: true)
-                .frame(height: 300)
+            MediaView(
+                post: .mock,
+                board: "preview",
+                isFullScreen: true
+            )
+            .frame(height: 300)
+            
+            Text("GIF/Video (Simulated)")
+            MediaView(
+                post: Post(no: 1, resto: 0, time: 0, now: "", name: "", sub: "", com: "", filename: "test", ext: ".gif", tim: 1, w: 500, h: 500, tn_w: 100, tn_h: 100, replies: 0, images: 0, sticky: nil, closed: nil, archived: nil, trip: nil, capcode: nil, country: nil, country_name: nil, filedeleted: nil, spoiler: nil, custom_spoiler: nil),
+                board: "v" // This will still use 4chan logic but Giphy might work if timed right, though board="preview" is better for picsum
+            )
+            .frame(height: 300)
         }
     }
 }
