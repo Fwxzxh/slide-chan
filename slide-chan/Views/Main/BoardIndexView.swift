@@ -102,7 +102,7 @@ struct ThreadLoadingView: View {
     var body: some View {
         // ZStack allows us to overlay content or backgrounds
         ZStack {
-            Color(UIColor.secondarySystemBackground).ignoresSafeArea()
+            Color.black.ignoresSafeArea()
             
             if let rootNode = viewModel.rootNode {
                 // Once data is available, transition to the actual detail view

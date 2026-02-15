@@ -34,66 +34,89 @@ struct ThreadDetailView: View {
     @State private var allThreadNodes: [ThreadNode] = []
     /// Flat list of all posts containing media in this branch.
     @State private var allMediaPosts: [Post] = []
+    
+    /// Dynamic top inset to account for Safe Area + Navigation Bar.
+    @State private var topInset: CGFloat = 100 // Default safe start to prevent overlap before measurement
 
     var body: some View {
-        // ScrollView allows vertical scrolling of the post content and replies.
-        ScrollView {
-            // VStack (Vertical Stack) stacks elements one on top of another.
-            VStack(spacing: 0) {
-                // 1. Header Section: Shows the image or video of the OP.
-                if rootNode.post.hasFile {
-                    headerArea
-                } else {
-                    // Small spacer if there's no media.
-                    Color.clear.frame(height: 10)
-                }
-                
-                // 2. Content Section: Metadata, Title (Subject), and Comment.
-                contentArea
-                
-                // 3. Replies Section: Lists all posts that replied to this one.
-                repliesArea
+        ZStack {
+            // 1. Invisible Measurement Layer
+            // This GeometryReader respects the safe area (because ZStack does by default).
+            // Its global minY gives us the exact bottom position of the Navigation Bar / Safe Area.
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear {
+                        let y = proxy.frame(in: .global).minY
+                        if y > 0 { topInset = y }
+                    }
+                    .onChange(of: proxy.frame(in: .global).minY) { _, newValue in
+                        if newValue > 0 { topInset = newValue }
+                    }
             }
+            .allowsHitTesting(false)
+            
+            // 2. Main ScrollView
+            // Ignores safe area to allow the blurred background to fill the screen top.
+            ScrollView(.vertical) {
+                VStack(spacing: 0) {
+                    // Header Section: Shows the image or video of the OP.
+                    if rootNode.post.hasFile {
+                        headerArea(topPadding: topInset)
+                    } else {
+                        // Ensure content starts below the navigation area when no media is present.
+                        Color.clear.frame(height: topInset)
+                    }
+                    
+                    // Content Section: Metadata, Title (Subject), and Comment.
+                    contentArea
+                    
+                    // Replies Section: Lists all posts that replied to this one.
+                    repliesArea
+                }
+                .containerRelativeFrame(.horizontal)
+            }
+            .ignoresSafeArea(edges: .top)
         }
+        .background(Color(UIColor.systemBackground))
         // Dynamic navigation title showing either the subject or the thread ID.
         .navigationTitle(depth == 0 ? (rootNode.post.sub?.decodedHTML ?? "Thread #\(String(rootNode.id))") : "[\(depth)] Replies")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            // Toolbar Items: Bookmark, Refresh, and Gallery buttons.
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    viewModel.toggleBookmark(board: board, threadId: rootNode.post.no, subject: rootNode.post.sub?.decodedHTML, previewText: rootNode.post.cleanComment)
-                } label: {
-                    Image(systemName: viewModel.isBookmarked(board: board, threadId: rootNode.post.no) ? "bookmark.fill" : "bookmark")
-                }
-            }
-            
-            if let onRefresh = onRefresh {
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                // Toolbar Items: Bookmark, Refresh, and Gallery buttons.
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { Task { await onRefresh() } } label: {
-                        Image(systemName: "arrow.clockwise")
+                    Button {
+                        viewModel.toggleBookmark(board: board, threadId: rootNode.post.no, subject: rootNode.post.sub?.decodedHTML, previewText: rootNode.post.cleanComment)
+                    } label: {
+                        Image(systemName: viewModel.isBookmarked(board: board, threadId: rootNode.post.no) ? "bookmark.fill" : "bookmark")
+                    }
+                }
+                
+                if let onRefresh = onRefresh {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button { Task { await onRefresh() } } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                    }
+                }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    NavigationLink(destination: ThreadGalleryView(nodes: allThreadNodes, board: board)) {
+                        Image(systemName: "square.grid.2x2")
                     }
                 }
             }
-            
-            ToolbarItem(placement: .navigationBarTrailing) {
-                NavigationLink(destination: ThreadGalleryView(nodes: allThreadNodes, board: board)) {
-                    Image(systemName: "square.grid.2x2")
-                }
+            // Presents the slideshow as a full-screen overlay.
+            .fullScreenCover(isPresented: $showSlideshow) {
+                FullScreenMediaView(
+                    allMediaPosts: allMediaPosts,
+                    board: board,
+                    currentIndex: $selectedIndex
+                )
             }
-        }
-        // Presents the slideshow as a full-screen overlay.
-        .fullScreenCover(isPresented: $showSlideshow) {
-            FullScreenMediaView(
-                allMediaPosts: allMediaPosts,
-                board: board,
-                currentIndex: $selectedIndex
-            )
-        }
-        .onAppear {
-            // Pre-calculate flat lists when the view appears.
-            prepareThreadData()
-        }
+            .onAppear {
+                // Pre-calculate flat lists when the view appears.
+                prepareThreadData()
+            }
     }
 
     // MARK: - Logic Helpers
@@ -108,38 +131,33 @@ struct ThreadDetailView: View {
     // MARK: - View Components
 
     /// Immersive header area showing the OP media with a blurred background.
-    private var headerArea: some View {
-        ZStack(alignment: .bottom) {
-            // 1. Background Layer (Blurred)
-            // This layer is forced to fill the entire horizontal space.
-            if let thumbUrl = rootNode.post.thumbnailUrl(board: board) {
-                GeometryReader { proxy in
-                    CachedImage(url: thumbUrl) {
+    private func headerArea(topPadding: CGFloat) -> some View {
+        // The MediaView dictates the height of the header area.
+        MediaView(post: rootNode.post, board: board)
+            .onTapGesture { openSlideshow(at: 0) }
+            .aspectRatio(rootNode.post.aspectRatio, contentMode: .fit)
+            // Add top padding to respect the safe area / nav bar visually
+            .padding(.top, topPadding)
+            // Limit the maximum height (including padding)
+            .frame(maxHeight: 500 + topPadding)
+            // Expand to full width so the background covers the screen horizontally
+            .frame(maxWidth: .infinity)
+            .background {
+                // Immersive blurred background
+                if let thumbUrl = rootNode.post.thumbnailUrl(board: board) {
+                    CachedImage(url: thumbUrl, contentMode: .fill) {
                         Color.black
                     }
-                    .blur(radius: 30)
-                    .overlay(Color.black.opacity(0.3))
-                    // We use proxy.size to ensure it fills the width regardless of content aspect.
-                    .frame(width: proxy.size.width, height: proxy.size.height + 200)
-                    .position(x: proxy.size.width / 2, y: (proxy.size.height / 2) - 100)
+                    .scaleEffect(1.5)
+                    .blur(radius: 40)
+                    .overlay(Color.black.opacity(0.4))
+                    // Ensure the background fills the available space
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .allowsHitTesting(false)
-                .ignoresSafeArea(edges: .top)
             }
-            
-            // 2. Main Media Layer
-            // This layer dictates the height of the ZStack but its width is centered.
-            MediaView(post: rootNode.post, board: board)
-                .onTapGesture { openSlideshow(at: 0) }
-                .aspectRatio(rootNode.post.aspectRatio, contentMode: .fit)
-                .frame(maxWidth: .infinity)
-                .frame(maxHeight: 500)
-        }
-        // Ensure the entire ZStack container always spans the full screen width.
-        .frame(maxWidth: .infinity)
-        .ignoresSafeArea(edges: .top)
+            .clipped() // Clip any background overflow
     }
-    
+
     /// Main text section for the post: includes name, date, subject, and the comment body.
     private var contentArea: some View {
         VStack(alignment: .leading, spacing: 12) {
