@@ -81,12 +81,14 @@ class BoardViewModel: ObservableObject {
         return bookmarks.contains(where: { $0.id == id })
     }
 
+    /// Persists the current list of bookmarks to UserDefaults.
     private func saveBookmarks() {
         if let encoded = try? JSONEncoder().encode(bookmarks) {
             UserDefaults.standard.set(encoded, forKey: bookmarksKey)
         }
     }
 
+    /// Loads bookmarked threads from UserDefaults during initialization.
     private func loadBookmarks() {
         if let data = UserDefaults.standard.data(forKey: bookmarksKey),
            let decoded = try? JSONDecoder().decode([BookmarkedThread].self, from: data) {
@@ -113,6 +115,7 @@ class BoardViewModel: ObservableObject {
         }
     }
 
+    /// Synchronizes the `boards` property with the filtered subset based on user preferences.
     private func filterBoards() {
         if showOnlySFW {
             self.boards = allBoards.filter { $0.isWorkSafe }
@@ -133,7 +136,7 @@ class BoardViewModel: ObservableObject {
         favoriteBoardIDs.contains(board.board)
     }
 
-    /// Toggles a board's favorite status.
+    /// Toggles a board's favorite status and persists the change.
     func toggleFavorite(_ board: Board) {
         withAnimation(.interpolatingSpring(stiffness: 300, damping: 25)) {
             if favoriteBoardIDs.contains(board.board) {
@@ -145,11 +148,13 @@ class BoardViewModel: ObservableObject {
         saveFavorites()
     }
 
+    /// Persists favorite board IDs to UserDefaults.
     private func saveFavorites() {
         let array = Array(favoriteBoardIDs)
         UserDefaults.standard.set(array, forKey: favoritesKey)
     }
 
+    /// Loads favorite board IDs from UserDefaults during initialization.
     private func loadFavorites() {
         if let array = UserDefaults.standard.stringArray(forKey: favoritesKey) {
             self.favoriteBoardIDs = Set(array)

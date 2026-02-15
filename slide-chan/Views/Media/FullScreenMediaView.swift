@@ -103,7 +103,7 @@ struct FullScreenMediaView: View {
             .offset(dragOffset)
             .ignoresSafeArea()
             .gesture(
-                DragGesture()
+                DragGesture(minimumDistance: 15)
                     .onChanged { gesture in
                         if abs(gesture.translation.height) > abs(gesture.translation.width) {
                             dragOffset = gesture.translation
@@ -166,7 +166,6 @@ struct FullScreenMediaView: View {
                             Image(systemName: "square.and.arrow.up")
                         }
                     }
-                    .padding(8)
                 }
             }
         }

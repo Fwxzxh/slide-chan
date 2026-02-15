@@ -1,5 +1,6 @@
 import Foundation
 
+/// General string manipulations and utility helpers.
 extension String {
     /// Decodes common HTML entities used by the 4chan API.
     var decodedHTML: String {

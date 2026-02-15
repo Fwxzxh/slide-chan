@@ -1,7 +1,9 @@
 import Foundation
 
 #if DEBUG
+/// Collection of mock data used for SwiftUI previews and unit testing.
 extension Board {
+    /// A standard mock board representing /v/ - Video Games.
     static let mock = Board(
         board: "v",
         title: "Video Games",
@@ -17,6 +19,7 @@ extension Board {
 }
 
 extension Post {
+    /// A standard Original Post (OP) with an image and subject.
     static let mock = Post(
         no: 123456789,
         resto: 0,
@@ -124,6 +127,7 @@ extension Post {
 }
 
 extension ThreadNode {
+    /// A small thread with one reply.
     static let mock = ThreadNode(
         post: .mock,
         replies: [
@@ -131,6 +135,7 @@ extension ThreadNode {
         ]
     )
     
+    /// A mock reply demonstrating greentext rendering.
     static let mockGreentext = ThreadNode(
         post: Post(
             no: 123456794,
@@ -310,6 +315,7 @@ extension ThreadNode {
 }
 
 extension BookmarkedThread {
+    /// A sample bookmarked thread for list previews.
     static let mock = BookmarkedThread(
         id: "v_123456789",
         board: "v",

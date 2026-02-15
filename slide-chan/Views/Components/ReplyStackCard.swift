@@ -83,10 +83,6 @@ struct ReplyStackCard: View {
                     // Small square preview of the image/video
                     MediaThumbnailView(post: node.post, board: board, size: 64)
                         .cornerRadius(Theme.radiusSmall)
-                        .onTapGesture { 
-                            // Tapping the thumbnail opens full-screen media
-                            showFullScreen = true 
-                        }
                 }
                 
                 // The actual comment text (renders HTML and green text)
