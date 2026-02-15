@@ -31,6 +31,10 @@ struct MediaView: View {
         }
         .id(retryID) // Changing this ID forces SwiftUI to re-create the view.
         .ignoresSafeArea(isFullScreen ? .all : [])
+        .onDisappear {
+            // Force cleanup of network tasks if the view is dismissed
+            loadError = false
+        }
     }
 
     // MARK: - Content Logic
@@ -78,28 +82,15 @@ struct MediaView: View {
 
     /// Native image component with loading and failure handling.
     private func standardImage(url: URL?) -> some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case .success(let image):
-                image.resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxWidth: .infinity)
-                    .onAppear { loadError = false }
-            case .failure(_):
-                // Trigger the error UI if download fails.
-                Color.clear.onAppear { loadError = true }
-            case .empty:
-                // Loading state.
-                ZStack {
-                    Color.secondary.opacity(0.05)
-                    ProgressView()
-                }
-                .aspectRatio(post.aspectRatio, contentMode: .fit)
-                .frame(maxWidth: .infinity)
-            @unknown default:
-                EmptyView()
+        CachedImage(url: url, contentMode: .fit) {
+            ZStack {
+                Color.secondary.opacity(0.05)
+                ProgressView()
             }
+            .aspectRatio(post.aspectRatio, contentMode: .fit)
+            .frame(maxWidth: .infinity)
         }
+        .frame(maxWidth: .infinity)
     }
 
     /// Error UI with a retry button for failed connections.
@@ -183,6 +174,13 @@ struct SimpleWebPlayer: UIViewRepresentable {
         </html>
         """
         uiView.loadHTMLString(html, baseURL: url)
+    }
+
+    /// Dismantles the view when it's removed from the hierarchy.
+    static func dismantleUIView(_ uiView: WKWebView, coordinator: ()) {
+        uiView.stopLoading()
+        uiView.loadHTMLString("", baseURL: nil) // Clear content to free memory
+        uiView.removeFromSuperview()
     }
 }
 

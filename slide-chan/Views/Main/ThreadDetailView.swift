@@ -114,14 +114,11 @@ struct ThreadDetailView: View {
             // This layer is forced to fill the entire horizontal space.
             if let thumbUrl = rootNode.post.thumbnailUrl(board: board) {
                 GeometryReader { proxy in
-                    AsyncImage(url: thumbUrl) { image in
-                        image.resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .blur(radius: 30)
-                            .overlay(Color.black.opacity(0.3))
-                    } placeholder: {
+                    CachedImage(url: thumbUrl) {
                         Color.black
                     }
+                    .blur(radius: 30)
+                    .overlay(Color.black.opacity(0.3))
                     // We use proxy.size to ensure it fills the width regardless of content aspect.
                     .frame(width: proxy.size.width, height: proxy.size.height + 200)
                     .position(x: proxy.size.width / 2, y: (proxy.size.height / 2) - 100)

@@ -48,34 +48,35 @@ class ThreadViewModel: ObservableObject {
             return
         }
 
-        // 1. Create a dictionary of all posts wrapped in nodes (classes) for fast access
+        // 1. Create a dictionary of all posts wrapped in nodes for fast access
         let nodes = allPosts.reduce(into: [Int: ThreadNode]()) { dict, post in
             dict[post.no] = ThreadNode(post: post)
         }
 
-        // 2. Relate each post with its parents (those it cites)
+        // 2. Relate each post with its parents and children
         for post in allPosts {
             guard let currentNode = nodes[post.no] else { continue }
-            let quotedIds = post.replyIds()
+            let quotedIds = Set(post.replyIds())
 
-            // In 4chan, if a post doesn't cite anyone specifically, it is considered a reply to the OP
-            if quotedIds.isEmpty && post.no != op.no {
-                nodes[op.no]?.replies.append(currentNode)
-            } else {
-                // Use a Set to avoid duplicates if a post cites the same post multiple times
-                for pId in Set(quotedIds) {
-                    // Avoid self-citations and verify the cited post exists in this thread
-                    if pId != post.no, let parentNode = nodes[pId] {
-                        parentNode.replies.append(currentNode)
-                    }
+            // Track who this post is quoting
+            for qId in quotedIds {
+                if let quotedNode = nodes[qId], qId != post.no {
+                    currentNode.quotes.append(quotedNode)
                 }
+            }
+
+            // Determine the "Primary Parent" for the visual tree hierarchy
+            // Priority: The highest quoted ID that exists in this thread, or the OP
+            let validQuotes = quotedIds.filter { nodes[$0] != nil && $0 != post.no }
+            let primaryParentId = validQuotes.max() ?? op.no
+            
+            if post.no != op.no {
+                nodes[primaryParentId]?.replies.append(currentNode)
             }
         }
 
         // 3. Assign the root node
-        if let opNode = nodes[op.no] {
-            self.rootNode = opNode
-        }
+        self.rootNode = nodes[op.no]
     }
 
     /// Refreshes the thread's posts.

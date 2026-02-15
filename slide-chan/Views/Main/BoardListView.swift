@@ -29,8 +29,8 @@ struct BoardListView: View {
     }
 
     var body: some View {
-        // NavigationView provides the stack-based navigation and top navigation bar.
-        NavigationView {
+        // NavigationStack is the modern replacement for NavigationView, providing better stability.
+        NavigationStack {
             // Group is used to return a single view type even if we have if/else logic inside.
             Group {
                 if viewModel.isLoading && viewModel.boards.isEmpty {

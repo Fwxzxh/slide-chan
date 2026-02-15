@@ -16,25 +16,17 @@ struct MediaThumbnailView: View {
         // ZStack layers the image and the optional media icon.
         ZStack(alignment: .bottomTrailing) {
             
-            // 1. Thumbnail Image
-            AsyncImage(url: post.thumbnailUrl(board: board)) { phase in
-                switch phase {
-                case .success(let image):
-                    image.resizable()
-                        .aspectRatio(contentMode: .fill) // Fills the square without distorting
-                case .failure(_):
-                    // Error state icon
-                    Color.gray.opacity(0.2)
-                        .overlay(Image(systemName: "photo").foregroundColor(.secondary))
-                case .empty:
-                    // Grey background while loading
-                    Color.secondary.opacity(0.05)
-                @unknown default:
-                    EmptyView()
-                }
+            // 1. Thumbnail Image using the custom persistent cache
+            CachedImage(url: post.thumbnailUrl(board: board)) {
+                // Placeholder shown while loading or on failure
+                Color.secondary.opacity(0.05)
+                    .overlay(
+                        Image(systemName: "photo")
+                            .foregroundColor(.secondary.opacity(0.3))
+                    )
             }
             .frame(width: size, height: size)
-            .clipped() // Ensures parts of the image that spill out of the square are hidden
+            .clipped()
             
             // 2. Media Type Icon (e.g., Play button for videos)
             if post.mediaType != .image {
@@ -56,7 +48,7 @@ struct MediaThumbnailView: View {
     private var mediaIcon: String {
         switch post.mediaType {
         case .video: return "play.fill"
-        case .gif: return "gif"
+        case .gif: return "play.square.stack.fill"
         case .pdf: return "doc.fill"
         default: return ""
         }
