@@ -71,6 +71,9 @@ struct FullScreenMediaView: View {
                             get: { currentIndex },
                             set: { if let val = $0 { currentIndex = val } }
                         ))
+                        .onChange(of: currentIndex) { _, _ in
+                            HapticManager.selection()
+                        }
                         .ignoresSafeArea()
 
                         // Toast overlay
@@ -141,7 +144,7 @@ struct FullScreenMediaView: View {
                                 dragOffset = gesture.translation
 
                                 if abs(dragOffset.height) > 80 && !hasTriggeredHaptic {
-                                    HapticManager.impact(style: .medium)
+                                    HapticManager.impact(style: .heavy)
                                     hasTriggeredHaptic = true
                                 } else if abs(dragOffset.height) < 80 {
                                     hasTriggeredHaptic = false
@@ -161,7 +164,7 @@ struct FullScreenMediaView: View {
                                 // Dismiss if dragged far enough OR if swiped with enough velocity
                                 if abs(dragOffset.height) > 100 || abs(velocity) > 300 {
                                     isDismissing = true
-                                    HapticManager.impact(style: .light)
+                                    HapticManager.notification(type: .success)
                                     
                                     // Animate the view away in the direction of the swipe
                                     // Using a slightly slower spring for a more dramatic/visible exit
