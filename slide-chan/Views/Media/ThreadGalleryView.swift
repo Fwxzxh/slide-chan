@@ -35,6 +35,20 @@ struct ThreadGalleryView: View {
         ScrollView {
             // LazyVStack only renders items as they are scrolled into view, saving memory.
             LazyVStack(spacing: 40) {
+                // Header with total count as a subtitle
+                VStack(spacing: 4) {
+                    Text("Gallery")
+                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    Text("\(mediaNodes.count) media files")
+                        .font(.system(size: 15, weight: .medium, design: .rounded))
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+
                 // The main feed of media items
                 contentStream
                 
@@ -46,17 +60,16 @@ struct ThreadGalleryView: View {
             }
             .padding(.bottom, 60)
         }
-        .navigationTitle("Gallery")
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Text("\(mediaNodes.count) files")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.secondary.opacity(0.1))
-                    .cornerRadius(Theme.radiusSmall)
+            ToolbarItem(placement: .principal) {
+                VStack(spacing: 0) {
+                    Text("Gallery")
+                        .font(.system(size: 16, weight: .bold))
+                    Text("\(mediaNodes.count) files")
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                }
             }
         }
         .fullScreenCover(isPresented: $showSlideshow) {
