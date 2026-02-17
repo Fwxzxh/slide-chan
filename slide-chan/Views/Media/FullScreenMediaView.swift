@@ -23,110 +23,146 @@ struct FullScreenMediaView: View {
     @State private var dragOffset: CGSize = .zero
     /// Status message for save operations.
     @State private var toastMessage: String?
+    /// Prevents the view from snapping back during dismissal
+    @State private var isDismissing = false
 
     /// Scale factor for swipe-to-dismiss animation.
     private var dragScale: CGFloat {
-        let maxDrag = 300.0
+        let maxDrag = 400.0
         let currentDrag = abs(dragOffset.height)
-        return max(0.8, 1.0 - (currentDrag / maxDrag) * 0.2)
+        return max(0.85, 1.0 - (currentDrag / maxDrag) * 0.15)
+    }
+    
+    /// Opacity for the black background based on drag distance.
+    private var backgroundOpacity: Double {
+        let maxDrag = 400.0
+        let currentDrag = abs(dragOffset.height)
+        return max(0.0, 1.0 - (currentDrag / maxDrag))
     }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                // Modern paging carousel using ScrollView (iOS 17+)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHStack(spacing: 0) {
-                        ForEach(allMediaPosts.indices, id: \.self) { index in
-                            MediaView(post: allMediaPosts[index], board: board, isFullScreen: true)
-                                .containerRelativeFrame(.horizontal) // Forces each page to be exactly screen width
-                                .id(index)
-                                .onTapGesture {
-                                    withAnimation(.easeInOut(duration: 0.2)) { showControls.toggle() }
-                                }
+                // Background that fades out during drag
+                Color.black
+                    .opacity(backgroundOpacity)
+                    .ignoresSafeArea()
+                
+                Group {
+                    // Modern paging carousel using ScrollView (iOS 17+)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(spacing: 0) {
+                            ForEach(allMediaPosts.indices, id: \.self) { index in
+                                MediaView(post: allMediaPosts[index], board: board, isFullScreen: true)
+                                    .containerRelativeFrame(.horizontal) // Forces each page to be exactly screen width
+                                    .id(index)
+                                    .onTapGesture {
+                                        withAnimation(.easeInOut(duration: 0.2)) { showControls.toggle() }
+                                    }
+                            }
                         }
+                        .scrollTargetLayout()
                     }
-                    .scrollTargetLayout()
-                }
-                .scrollTargetBehavior(.paging) // Mimics TabView paging but more efficiently
-                .scrollPosition(id: Binding(
-                    get: { currentIndex },
-                    set: { if let val = $0 { currentIndex = val } }
-                ))
-                .ignoresSafeArea()
+                    .scrollTargetBehavior(.paging) // Mimics TabView paging but more efficiently
+                    .scrollPosition(id: Binding(
+                        get: { currentIndex },
+                        set: { if let val = $0 { currentIndex = val } }
+                    ))
+                    .ignoresSafeArea()
 
-                // Toast overlay
-                if let toast = toastMessage {
+                    // Toast overlay
+                    if let toast = toastMessage {
+                        VStack {
+                            Spacer()
+                            Text(toast)
+                                .font(.system(size: 14, weight: .medium))
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .glassEffect()
+                            Spacer()
+                        }
+                        .zIndex(2)
+                    }
+
+                    // Manual Bottom Bar Overlay (to avoid UIKitToolbar errors)
                     VStack {
                         Spacer()
-                        Text(toast)
-                            .font(.system(size: 14, weight: .medium))
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 10)
-                            .glassEffect()
-                        Spacer()
-                    }
-                    .zIndex(2)
-                }
-
-                // Manual Bottom Bar Overlay (to avoid UIKitToolbar errors)
-                VStack {
-                    Spacer()
-                    HStack {
-                        if let filename = allMediaPosts[currentIndex].filename {
-                            Text(filename + (allMediaPosts[currentIndex].ext ?? ""))
-                                .font(.system(size: 13, weight: .medium, design: .rounded))
-                                .lineLimit(1)
-                                .truncationMode(.middle)
+                        HStack {
+                            if let filename = allMediaPosts[currentIndex].filename {
+                                Text(filename + (allMediaPosts[currentIndex].ext ?? ""))
+                                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 12)
+                                    .glassEffect()
+                            }
+                            
+                            Spacer()
+                            
+                            Text("\(currentIndex + 1) / \(allMediaPosts.count)")
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 12)
                                 .glassEffect()
                         }
-                        
-                        Spacer()
-                        
-                        Text("\(currentIndex + 1) / \(allMediaPosts.count)")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 12)
-                            .glassEffect()
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 20) 
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 20) 
+                    .opacity(showControls ? 1 : 0)
+                    .allowsHitTesting(false)
                 }
-                .opacity(showControls ? 1 : 0)
-                .allowsHitTesting(false)
+                .opacity(isDismissing ? 0 : (dragOffset == .zero ? 1.0 : Double(dragScale)))
+                .scaleEffect(dragScale)
+                .offset(dragOffset)
             }
-            .background(Color.black.ignoresSafeArea())
-            .opacity(dragOffset == .zero ? 1.0 : Double(dragScale))
-            .scaleEffect(dragScale)
-            .offset(dragOffset)
             .ignoresSafeArea()
             .gesture(
                 DragGesture(minimumDistance: 15)
                     .onChanged { gesture in
+                        if isDismissing { return }
+                        // Only track vertical movement if it's dominant
                         if abs(gesture.translation.height) > abs(gesture.translation.width) {
                             dragOffset = gesture.translation
 
-                            if abs(dragOffset.height) > 150 && !hasTriggeredHaptic {
+                            if abs(dragOffset.height) > 100 && !hasTriggeredHaptic {
                                 HapticManager.impact(style: .medium)
                                 hasTriggeredHaptic = true
-                            } else if abs(dragOffset.height) < 150 {
+                            } else if abs(dragOffset.height) < 100 {
                                 hasTriggeredHaptic = false
                             }
 
                             if showControls {
-                                withAnimation { showControls = false }
+                                withAnimation(.easeInOut(duration: 0.2)) { showControls = false }
                             }
                         }
                     }
                     .onEnded { gesture in
-                        if abs(dragOffset.height) > 150 {
+                        if isDismissing { return }
+                        let velocity = gesture.predictedEndTranslation.height - gesture.translation.height
+                        
+                        // Dismiss if dragged far enough OR if swiped with enough velocity
+                        if abs(dragOffset.height) > 150 || abs(velocity) > 500 {
+                            isDismissing = true
                             HapticManager.impact(style: .light)
-                            dismiss()
+                            
+                            // Animate the view away in the direction of the swipe
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                if dragOffset.height > 0 {
+                                    dragOffset.height = UIScreen.main.bounds.height
+                                } else {
+                                    dragOffset.height = -UIScreen.main.bounds.height
+                                }
+                            }
+                            
+                            // Delay dismissal slightly to let the animation play out
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                dismiss()
+                            }
                         } else {
-                            withAnimation(.interactiveSpring()) {
+                            withAnimation(.interactiveSpring(response: 0.35, dampingFraction: 0.7)) {
                                 dragOffset = .zero
+                                if !showControls { showControls = true }
                             }
                         }
                     }

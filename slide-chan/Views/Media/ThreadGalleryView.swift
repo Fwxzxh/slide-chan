@@ -61,6 +61,7 @@ struct ThreadGalleryView: View {
                 board: board,
                 currentIndex: $selectedIndex
             )
+            .presentationBackground(.clear)
         }
     }
     

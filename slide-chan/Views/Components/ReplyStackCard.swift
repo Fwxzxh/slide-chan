@@ -100,6 +100,7 @@ struct ReplyStackCard: View {
         .fullScreenCover(isPresented: $showFullScreen) {
             // Full screen media modal
             FullScreenMediaView(allMediaPosts: [node.post], board: board, currentIndex: .constant(0))
+                .presentationBackground(.clear)
         }
     }
 }

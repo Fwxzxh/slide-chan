@@ -112,6 +112,7 @@ struct ThreadDetailView: View {
                     board: board,
                     currentIndex: $selectedIndex
                 )
+                .presentationBackground(.clear)
             }
             .onAppear {
                 // Pre-calculate flat lists when the view appears.
