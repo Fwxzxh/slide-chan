@@ -37,6 +37,8 @@ struct ThreadDetailView: View {
     
     /// Dynamic top inset to account for Safe Area + Navigation Bar.
     @State private var topInset: CGFloat = 100 // Default safe start to prevent overlap before measurement
+    /// Tracking for pull-to-view-media
+    @State private var hasTriggeredPullMedia = false
 
     var body: some View {
         ZStack {
@@ -59,6 +61,16 @@ struct ThreadDetailView: View {
             // Ignores safe area to allow the blurred background to fill the screen top.
             ScrollView(.vertical) {
                 VStack(spacing: 0) {
+                    // Pull trigger detector
+                    GeometryReader { proxy in
+                        let minY = proxy.frame(in: .named("scroll")).minY
+                        Color.clear
+                            .onChange(of: minY) { _, newValue in
+                                handlePullToMedia(offset: newValue)
+                            }
+                    }
+                    .frame(height: 0)
+
                     // Header Section: Shows the image or video of the OP.
                     if rootNode.post.hasFile {
                         headerArea(topPadding: topInset)
@@ -75,6 +87,7 @@ struct ThreadDetailView: View {
                 }
                 .containerRelativeFrame(.horizontal)
             }
+            .coordinateSpace(name: "scroll")
             .ignoresSafeArea(edges: .top)
         }
         .background(Color(UIColor.systemBackground))
@@ -299,6 +312,22 @@ struct ThreadDetailView: View {
     private func openSlideshow(at index: Int) {
         self.selectedIndex = index
         self.showSlideshow = true
+    }
+
+    /// Handles the "Pull Down to View Media" logic.
+    private func handlePullToMedia(offset: CGFloat) {
+        // Only trigger if we are pulling down significantly (e.g. > 100px)
+        // and only if the current post actually has media.
+        guard rootNode.post.hasFile, !showSlideshow, !hasTriggeredPullMedia else {
+            if offset < 20 { hasTriggeredPullMedia = false }
+            return
+        }
+
+        if offset > 120 {
+            hasTriggeredPullMedia = true
+            HapticManager.notification(type: .success)
+            openSlideshow(at: 0)
+        }
     }
 }
 
