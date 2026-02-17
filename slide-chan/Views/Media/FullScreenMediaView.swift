@@ -141,12 +141,14 @@ struct FullScreenMediaView: View {
                             }
                             
                             if isVerticalDragActive {
-                                // Apply a damping factor (0.8) to the translation to "smooth" the movement 
-                                // and make it feel less twitchy/jittery.
-                                dragOffset = CGSize(
-                                    width: gesture.translation.width * 0.8,
-                                    height: gesture.translation.height * 0.8
-                                )
+                                // Apply a stronger damping factor (0.6) and wrap in a spring animation
+                                // to make the movement feel incredibly smooth and "organic".
+                                withAnimation(.interactiveSpring(response: 0.15, dampingFraction: 0.85)) {
+                                    dragOffset = CGSize(
+                                        width: gesture.translation.width * 0.6,
+                                        height: gesture.translation.height * 0.6
+                                    )
+                                }
 
                                 if abs(dragOffset.height) > 120 && !hasTriggeredHaptic {
                                     HapticManager.impact(style: .heavy)
