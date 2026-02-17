@@ -35,12 +35,6 @@ struct ThreadGalleryView: View {
         ScrollView {
             // LazyVStack only renders items as they are scrolled into view, saving memory.
             LazyVStack(spacing: 40) {
-                // Header showing total count
-                Text("\(mediaNodes.count) media files")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .padding(.top)
-
                 // The main feed of media items
                 contentStream
                 
@@ -54,6 +48,17 @@ struct ThreadGalleryView: View {
         }
         .navigationTitle("Gallery")
         .navigationBarTitleDisplayMode(.large)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Text("\(mediaNodes.count) files")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.secondary.opacity(0.1))
+                    .cornerRadius(Theme.radiusSmall)
+            }
+        }
         .fullScreenCover(isPresented: $showSlideshow) {
             // Reuses the same FullScreenMediaView as the thread detail.
             FullScreenMediaView(
