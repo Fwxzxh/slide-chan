@@ -18,6 +18,9 @@ struct ThreadGalleryView: View {
     @State private var selectedIndex = 0
     @State private var showSlideshow = false
     
+    /// Tracks scroll position to conditionally show toolbar title
+    @State private var scrollOffset: CGFloat = 0
+    
     /// Computes a flat list of unique posts that actually contain media.
     private var mediaNodes: [ThreadNode] {
         var seen = Set<Int>()
@@ -33,6 +36,16 @@ struct ThreadGalleryView: View {
     
     var body: some View {
         ScrollView {
+            // Invisible detector for scroll position
+            GeometryReader { proxy in
+                let minY = proxy.frame(in: .named("galleryScroll")).minY
+                Color.clear
+                    .onChange(of: minY) { _, newValue in
+                        scrollOffset = newValue
+                    }
+            }
+            .frame(height: 0)
+
             // LazyVStack only renders items as they are scrolled into view, saving memory.
             LazyVStack(spacing: 40) {
                 // Header with total count as a subtitle
@@ -60,6 +73,7 @@ struct ThreadGalleryView: View {
             }
             .padding(.bottom, 60)
         }
+        .coordinateSpace(name: "galleryScroll")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .principal) {
@@ -70,6 +84,8 @@ struct ThreadGalleryView: View {
                         .font(.system(size: 10))
                         .foregroundColor(.secondary)
                 }
+                .opacity(scrollOffset < -60 ? 1 : 0)
+                .animation(.easeInOut(duration: 0.2), value: scrollOffset)
             }
         }
         .fullScreenCover(isPresented: $showSlideshow) {
