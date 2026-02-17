@@ -7,6 +7,8 @@ struct ZoomableImageView: View {
     
     /// The remote URL of the image to download and display.
     let url: URL
+    /// The original dimensions of the image, used for precise boundary calculations.
+    let imageSize: CGSize?
     
     // MARK: - State Management
     
@@ -18,8 +20,6 @@ struct ZoomableImageView: View {
     @State private var offset: CGSize = .zero
     /// Tracking the offset from the previous gesture update.
     @State private var lastOffset: CGSize = .zero
-    /// The anchor point for zooming.
-    @State private var zoomAnchor: UnitPoint = .center
     
     var body: some View {
         GeometryReader { geometry in
@@ -30,7 +30,7 @@ struct ZoomableImageView: View {
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .scaleEffect(scale, anchor: zoomAnchor) // Apply zoom level with anchor
+                        .scaleEffect(scale) // Always scale from center for predictable panning
                         .offset(offset)     // Apply panning position
                         
                         // 1. Pinch-to-Zoom Gesture (Magnification)
@@ -47,7 +47,7 @@ struct ZoomableImageView: View {
                                     }
                                     
                                     withAnimation(.interactiveSpring()) {
-                                        scale = min(max(newScale, 0.8), 6.0) // Allow slightly more/less for rubber banding
+                                        scale = min(max(newScale, 0.8), 6.0)
                                     }
                                 }
                                 .onEnded { _ in
@@ -55,34 +55,31 @@ struct ZoomableImageView: View {
                                     withAnimation(.spring()) {
                                         if scale < 1.0 {
                                             resetImageState()
-                                        } else if scale > 5.0 {
-                                            scale = 5.0
+                                        } else {
+                                            if scale > 5.0 { scale = 5.0 }
+                                            validateBoundaries(size: geometry.size)
                                         }
                                     }
                                 }
                         )
                         
-                        // 2. Drag Gesture (Panning) - Use highPriorityGesture to beat parent/TabView gestures when zoomed
+                        // 2. Drag Gesture (Panning)
                         .highPriorityGesture(
                             scale > 1.0 ? 
-                            DragGesture(minimumDistance: 10) // Small distance to allow double tap recognition
+                            DragGesture(minimumDistance: 10)
                                 .onChanged { value in
-                                    // Calculate movement relative to the last confirmed position
                                     let deltaW = value.translation.width - lastOffset.width
                                     let deltaH = value.translation.height - lastOffset.height
                                     
-                                    // We use a small animation to keep it fluid
+                                    lastOffset = value.translation
+                                    
                                     withAnimation(.interactiveSpring()) {
                                         offset.width += deltaW
                                         offset.height += deltaH
                                     }
-                                    
-                                    lastOffset = value.translation
                                 }
                                 .onEnded { _ in
-                                    // Reset the tracker for the next gesture session
                                     lastOffset = .zero
-                                    
                                     withAnimation(.interactiveSpring()) {
                                         validateBoundaries(size: geometry.size)
                                     }
@@ -90,7 +87,7 @@ struct ZoomableImageView: View {
                             : nil
                         )
                         
-                        // 3. Double-Tap Shortcut - Also use highPriority to ensure it works when zoomed
+                        // 3. Double-Tap Shortcut
                         .highPriorityGesture(
                             SpatialTapGesture(count: 2)
                                 .onEnded { event in
@@ -100,12 +97,18 @@ struct ZoomableImageView: View {
                                         if scale > 1.05 {
                                             resetImageState()
                                         } else {
-                                            // Zoom into the tapped area
-                                            zoomAnchor = UnitPoint(
-                                                x: location.x / geometry.size.width,
-                                                y: location.y / geometry.size.height
-                                            )
                                             scale = 3.0
+                                            // Calculate offset to center the tapped point
+                                            let centerX = geometry.size.width / 2
+                                            let centerY = geometry.size.height / 2
+                                            let dx = location.x - centerX
+                                            let dy = location.y - centerY
+                                            
+                                            // We want the point at (dx, dy) to be at (0, 0)
+                                            // When scaling around center, point at dx moves to dx * scale
+                                            // So we need offset = -dx * scale
+                                            offset = CGSize(width: -dx * scale, height: -dy * scale)
+                                            validateBoundaries(size: geometry.size)
                                         }
                                     }
                                 }
@@ -131,13 +134,33 @@ struct ZoomableImageView: View {
         scale = 1.0
         offset = .zero
         lastOffset = .zero
-        zoomAnchor = .center
     }
     
     private func validateBoundaries(size: CGSize) {
-        // Simple boundary clamping
-        let maxX = (size.width * (scale - 1)) / 2
-        let maxY = (size.height * (scale - 1)) / 2
+        // Calculate the actual size of the image as it fits in the container (.fit mode)
+        let aspect = imageSize.flatMap { $0.width > 0 && $0.height > 0 ? $0.width / $0.height : nil } ?? (size.width / size.height)
+        
+        let fittedWidth: CGFloat
+        let fittedHeight: CGFloat
+        
+        if (size.width / size.height) > aspect {
+            // Container is relatively wider than the image
+            fittedHeight = size.height
+            fittedWidth = size.height * aspect
+        } else {
+            // Container is relatively taller than the image
+            fittedWidth = size.width
+            fittedHeight = size.width / aspect
+        }
+        
+        // The total size of the content after applying the scale
+        let scaledWidth = fittedWidth * scale
+        let scaledHeight = fittedHeight * scale
+        
+        // maxX and maxY represent how much we can pan from the center before showing empty space.
+        // If the scaled dimension is smaller than the container, we keep it at 0 (centered).
+        let maxX = max(0, (scaledWidth - size.width) / 2)
+        let maxY = max(0, (scaledHeight - size.height) / 2)
         
         var newOffset = offset
         
@@ -151,5 +174,8 @@ struct ZoomableImageView: View {
 }
 
 #Preview {
-    ZoomableImageView(url: URL(string: "https://picsum.photos/1000/1500")!)
+    ZoomableImageView(
+        url: URL(string: "https://picsum.photos/1000/1500")!,
+        imageSize: CGSize(width: 1000, height: 1500)
+    )
 }

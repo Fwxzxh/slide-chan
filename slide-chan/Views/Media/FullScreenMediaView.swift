@@ -166,6 +166,7 @@ struct FullScreenMediaView: View {
                             Image(systemName: "square.and.arrow.up")
                         }
                     }
+                    .padding(6)
                 }
             }
         }

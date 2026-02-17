@@ -53,7 +53,10 @@ struct MediaView: View {
             if isFullScreen {
                 // Custom zoomable view implementation.
                 if let url = url {
-                    ZoomableImageView(url: url)
+                    ZoomableImageView(
+                        url: url,
+                        imageSize: CGSize(width: post.w ?? 0, height: post.h ?? 0)
+                    )
                 }
             } else {
                 standardImage(url: url)
