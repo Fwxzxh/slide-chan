@@ -25,17 +25,19 @@ struct FullScreenMediaView: View {
     @State private var toastMessage: String?
     /// Prevents the view from snapping back during dismissal
     @State private var isDismissing = false
+    /// Tracks if we have "locked" into a vertical dismissal gesture to avoid horizontal interference
+    @State private var isVerticalDragActive = false
 
     /// Scale factor for swipe-to-dismiss animation.
     private var dragScale: CGFloat {
-        let maxDrag = 400.0
+        let maxDrag = 500.0
         let currentDrag = abs(dragOffset.height)
-        return max(0.85, 1.0 - (currentDrag / maxDrag) * 0.15)
+        return max(0.8, 1.0 - (currentDrag / maxDrag) * 0.2)
     }
     
     /// Opacity for the black background based on drag distance.
     private var backgroundOpacity: Double {
-        let maxDrag = 400.0
+        let maxDrag = 500.0
         let currentDrag = abs(dragOffset.height)
         return max(0.0, 1.0 - (currentDrag / maxDrag))
     }
@@ -118,18 +120,30 @@ struct FullScreenMediaView: View {
                     .offset(dragOffset)
                 }
                 .ignoresSafeArea()
-                .gesture(
-                    DragGesture(minimumDistance: 15)
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 10)
                         .onChanged { gesture in
                             if isDismissing { return }
-                            // Only track vertical movement if it's dominant
-                            if abs(gesture.translation.height) > abs(gesture.translation.width) {
+                            
+                            // Decide if we should lock into a vertical dismissal
+                            if !isVerticalDragActive {
+                                let horizontalAmount = abs(gesture.translation.width)
+                                let verticalAmount = abs(gesture.translation.height)
+                                
+                                // Bias: Vertical needs to be at least as strong as horizontal to start dismissal
+                                // This helps prevent accidental dismissal while paging
+                                if verticalAmount > horizontalAmount && verticalAmount > 10 {
+                                    isVerticalDragActive = true
+                                }
+                            }
+                            
+                            if isVerticalDragActive {
                                 dragOffset = gesture.translation
 
-                                if abs(dragOffset.height) > 100 && !hasTriggeredHaptic {
+                                if abs(dragOffset.height) > 80 && !hasTriggeredHaptic {
                                     HapticManager.impact(style: .medium)
                                     hasTriggeredHaptic = true
-                                } else if abs(dragOffset.height) < 100 {
+                                } else if abs(dragOffset.height) < 80 {
                                     hasTriggeredHaptic = false
                                 }
 
@@ -140,34 +154,41 @@ struct FullScreenMediaView: View {
                         }
                         .onEnded { gesture in
                             if isDismissing { return }
-                            let velocity = gesture.predictedEndTranslation.height - gesture.translation.height
                             
-                            // Dismiss if dragged far enough OR if swiped with enough velocity
-                            if abs(dragOffset.height) > 150 || abs(velocity) > 500 {
-                                isDismissing = true
-                                HapticManager.impact(style: .light)
+                            if isVerticalDragActive {
+                                let velocity = gesture.predictedEndTranslation.height - gesture.translation.height
                                 
-                                // Animate the view away in the direction of the swipe
-                                withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
-                                    if dragOffset.height > 0 {
-                                        dragOffset.height = geometry.size.height
-                                    } else {
-                                        dragOffset.height = -geometry.size.height
+                                // Dismiss if dragged far enough OR if swiped with enough velocity
+                                if abs(dragOffset.height) > 100 || abs(velocity) > 300 {
+                                    isDismissing = true
+                                    HapticManager.impact(style: .light)
+                                    
+                                    // Animate the view away in the direction of the swipe
+                                    // Using a slightly slower spring for a more dramatic/visible exit
+                                    withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
+                                        if dragOffset.height > 0 {
+                                            dragOffset.height = geometry.size.height + 100
+                                        } else {
+                                            dragOffset.height = -geometry.size.height - 100
+                                        }
+                                    }
+                                    
+                                    // Delay dismissal to let the animation play out visibly
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                                        dismiss()
+                                    }
+                                } else {
+                                    withAnimation(.interactiveSpring(response: 0.35, dampingFraction: 0.7)) {
+                                        dragOffset = .zero
+                                        if !showControls { showControls = true }
                                     }
                                 }
-                                
-                                // Delay dismissal slightly to let the animation play out
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                    dismiss()
-                                }
-                            } else {
-                                withAnimation(.interactiveSpring(response: 0.35, dampingFraction: 0.7)) {
-                                    dragOffset = .zero
-                                    if !showControls { showControls = true }
-                                }
                             }
+                            
+                            isVerticalDragActive = false
                         }
                 )
+
             }
             .toolbar(showControls ? .visible : .hidden, for: .navigationBar)
             .toolbarBackground(.hidden, for: .navigationBar)
