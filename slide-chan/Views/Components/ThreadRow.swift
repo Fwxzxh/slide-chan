@@ -59,9 +59,7 @@ struct ThreadRow: View {
                     Spacer() // Pushes the ID to the far right
 
                     // Thread ID (#12345)
-                    Text("#\(String(post.no))")
-                        .font(.system(size: 10, weight: .bold, design: .monospaced))
-                        .foregroundColor(.appSecondary.opacity(0.8))
+                    PostIDBadge(postNumber: post.no)
                 }
 
                 // Comment Snippet (Preview of the post body)

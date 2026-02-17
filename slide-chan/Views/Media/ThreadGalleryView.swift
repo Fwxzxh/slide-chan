@@ -116,9 +116,7 @@ struct ThreadGalleryView: View {
                                 .font(.caption.bold())
                         }
                         
-                        Text("#\(String(node.post.no))")
-                            .font(.caption.monospaced())
-                            .foregroundColor(.secondary)
+                        PostIDBadge(postNumber: node.post.no)
                     }
                 }
                 .padding(.horizontal, 4)

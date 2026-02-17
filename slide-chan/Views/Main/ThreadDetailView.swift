@@ -246,13 +246,7 @@ struct ThreadDetailView: View {
                 Spacer()
                 
                 // Post Number (#1234567)
-                Text("#\(String(rootNode.post.no))")
-                    .font(.system(size: 11, weight: .heavy, design: .monospaced))
-                    .foregroundColor(.orange)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.orange.opacity(0.1))
-                    .cornerRadius(Theme.radiusXS)
+                PostIDBadge(postNumber: rootNode.post.no)
             }
             
             // Filename display for attachments.

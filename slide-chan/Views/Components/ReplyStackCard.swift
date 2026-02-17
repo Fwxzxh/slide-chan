@@ -54,13 +54,7 @@ struct ReplyStackCard: View {
                 }
                 
                 // Unique 4chan post number (styled with a code font)
-                Text("#\(String(node.post.no))")
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
-                    .foregroundColor(.orange)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.orange.opacity(0.1))
-                    .cornerRadius(Theme.radiusXS)
+                PostIDBadge(postNumber: node.post.no)
             }
             
             // 2. Attachment Filename (optional)
