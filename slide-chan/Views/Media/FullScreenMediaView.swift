@@ -124,7 +124,7 @@ struct FullScreenMediaView: View {
                 }
                 .ignoresSafeArea()
                 .simultaneousGesture(
-                    DragGesture(minimumDistance: 10)
+                    DragGesture(minimumDistance: 20)
                         .onChanged { gesture in
                             if isDismissing { return }
                             
@@ -133,20 +133,25 @@ struct FullScreenMediaView: View {
                                 let horizontalAmount = abs(gesture.translation.width)
                                 let verticalAmount = abs(gesture.translation.height)
                                 
-                                // Bias: Vertical needs to be at least as strong as horizontal to start dismissal
-                                // This helps prevent accidental dismissal while paging
-                                if verticalAmount > horizontalAmount && verticalAmount > 10 {
+                                // Bias: Vertical needs to be significantly stronger than horizontal to start dismissal
+                                // Added a multiplier to horizontal to make it "stickier" horizontally
+                                if verticalAmount > (horizontalAmount * 1.5) && verticalAmount > 20 {
                                     isVerticalDragActive = true
                                 }
                             }
                             
                             if isVerticalDragActive {
-                                dragOffset = gesture.translation
+                                // Apply a damping factor (0.8) to the translation to "smooth" the movement 
+                                // and make it feel less twitchy/jittery.
+                                dragOffset = CGSize(
+                                    width: gesture.translation.width * 0.8,
+                                    height: gesture.translation.height * 0.8
+                                )
 
-                                if abs(dragOffset.height) > 80 && !hasTriggeredHaptic {
+                                if abs(dragOffset.height) > 120 && !hasTriggeredHaptic {
                                     HapticManager.impact(style: .heavy)
                                     hasTriggeredHaptic = true
-                                } else if abs(dragOffset.height) < 80 {
+                                } else if abs(dragOffset.height) < 120 {
                                     hasTriggeredHaptic = false
                                 }
 
@@ -161,13 +166,12 @@ struct FullScreenMediaView: View {
                             if isVerticalDragActive {
                                 let velocity = gesture.predictedEndTranslation.height - gesture.translation.height
                                 
-                                // Dismiss if dragged far enough OR if swiped with enough velocity
-                                if abs(dragOffset.height) > 100 || abs(velocity) > 300 {
+                                // Increased thresholds to make it less sensitive
+                                if abs(dragOffset.height) > 150 || abs(velocity) > 500 {
                                     isDismissing = true
                                     HapticManager.notification(type: .success)
                                     
                                     // Animate the view away in the direction of the swipe
-                                    // Using a slightly slower spring for a more dramatic/visible exit
                                     withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) {
                                         if dragOffset.height > 0 {
                                             dragOffset.height = geometry.size.height + 100
