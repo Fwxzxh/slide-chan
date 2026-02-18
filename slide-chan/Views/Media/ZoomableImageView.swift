@@ -9,6 +9,8 @@ struct ZoomableImageView: View {
     let url: URL
     /// The original dimensions of the image, used for precise boundary calculations.
     let imageSize: CGSize?
+    /// External binding to report the current scale to parents.
+    @Binding var externalScale: CGFloat
     
     // MARK: - State Management
     
@@ -124,6 +126,9 @@ struct ZoomableImageView: View {
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
             .clipped() // Ensure zoomed image doesn't spill over
+            .onChange(of: scale) { _, newValue in
+                externalScale = newValue
+            }
         }
         .ignoresSafeArea()
     }
@@ -176,6 +181,7 @@ struct ZoomableImageView: View {
 #Preview {
     ZoomableImageView(
         url: URL(string: "https://picsum.photos/1000/1500")!,
-        imageSize: CGSize(width: 1000, height: 1500)
+        imageSize: CGSize(width: 1000, height: 1500),
+        externalScale: .constant(1.0)
     )
 }

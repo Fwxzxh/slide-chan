@@ -27,6 +27,8 @@ struct FullScreenMediaView: View {
     @State private var isDismissing = false
     /// Tracks if we have "locked" into a vertical dismissal gesture to avoid horizontal interference
     @State private var isVerticalDragActive = false
+    /// Tracks the current zoom scale of the active image
+    @State private var currentImageScale: CGFloat = 1.0
 
     /// Scale factor for swipe-to-dismiss animation.
     private var dragScale: CGFloat {
@@ -56,8 +58,13 @@ struct FullScreenMediaView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             LazyHStack(spacing: 0) {
                                 ForEach(allMediaPosts.indices, id: \.self) { index in
-                                    MediaView(post: allMediaPosts[index], board: board, isFullScreen: true)
-                                        .containerRelativeFrame(.horizontal) // Forces each page to be exactly screen width
+                                    MediaView(
+                                        post: allMediaPosts[index],
+                                        board: board,
+                                        isFullScreen: true,
+                                        zoomScale: $currentImageScale
+                                    )
+                                    .containerRelativeFrame(.horizontal) // Forces each page to be exactly screen width
                                         .id(index)
                                         .onTapGesture {
                                             withAnimation(.easeInOut(duration: 0.2)) { showControls.toggle() }
@@ -73,6 +80,7 @@ struct FullScreenMediaView: View {
                         ))
                         .onChange(of: currentIndex) { _, _ in
                             HapticManager.selection()
+                            currentImageScale = 1.0 // Reset scale when changing photo
                         }
                         .ignoresSafeArea()
 
@@ -126,7 +134,7 @@ struct FullScreenMediaView: View {
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 20)
                         .onChanged { gesture in
-                            if isDismissing { return }
+                            if isDismissing || currentImageScale > 1.01 { return }
                             
                             // Decide if we should lock into a vertical dismissal
                             if !isVerticalDragActive {
@@ -163,7 +171,7 @@ struct FullScreenMediaView: View {
                             }
                         }
                         .onEnded { gesture in
-                            if isDismissing { return }
+                            if isDismissing || currentImageScale > 1.01 { return }
                             
                             if isVerticalDragActive {
                                 let velocity = gesture.predictedEndTranslation.height - gesture.translation.height

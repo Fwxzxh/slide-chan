@@ -13,6 +13,8 @@ struct MediaView: View {
     let board: String
     /// When true, enables zooming for images and controls for videos.
     var isFullScreen: Bool = false
+    /// Optional binding to track zoom scale, only used in full screen images.
+    var zoomScale: Binding<CGFloat>? = nil
     
     /// Internal state to track if a download failed.
     @State private var loadError = false
@@ -55,7 +57,8 @@ struct MediaView: View {
                 if let url = url {
                     ZoomableImageView(
                         url: url,
-                        imageSize: CGSize(width: post.w ?? 0, height: post.h ?? 0)
+                        imageSize: CGSize(width: post.w ?? 0, height: post.h ?? 0),
+                        externalScale: zoomScale ?? .constant(1.0)
                     )
                 }
             } else {
