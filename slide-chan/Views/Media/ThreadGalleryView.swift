@@ -47,7 +47,7 @@ struct ThreadGalleryView: View {
             .frame(height: 0)
 
             // LazyVStack only renders items as they are scrolled into view, saving memory.
-            LazyVStack(spacing: 40) {
+            LazyVStack(spacing: 24) {
                 // Header with total count as a subtitle
                 VStack(spacing: 4) {
                     Text("Gallery")
@@ -59,7 +59,7 @@ struct ThreadGalleryView: View {
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
                 .padding(.top, 10)
 
                 // The main feed of media items
@@ -68,7 +68,7 @@ struct ThreadGalleryView: View {
                 // Show a spinner at the bottom if there are more items to load
                 if visibleItemsCount < mediaNodes.count {
                     ProgressView()
-                        .padding(.vertical, 40)
+                        .padding(.vertical, 30)
                 }
             }
             .padding(.bottom, 60)
@@ -104,7 +104,7 @@ struct ThreadGalleryView: View {
     /// Iterates through the media list and builds the UI for each item.
     private var contentStream: some View {
         ForEach(Array(mediaNodes.prefix(visibleItemsCount).enumerated()), id: \.element.post.no) { index, node in
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 10) {
                 
                 // 1. Large Media Preview
                 MediaView(post: node.post, board: board)
@@ -117,7 +117,7 @@ struct ThreadGalleryView: View {
                     }
                 
                 // 2. File and Context Metadata
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         // Display filename (e.g., sample.jpg)
                         if let filename = node.post.filename {
@@ -155,7 +155,7 @@ struct ThreadGalleryView: View {
                 }
                 .padding(.horizontal, 4)
             }
-            .padding(.horizontal, 20)
+            .padding(.horizontal, 16)
             .onAppear {
                 // When the last visible item appears, load the next batch of 15.
                 if index == visibleItemsCount - 1 {

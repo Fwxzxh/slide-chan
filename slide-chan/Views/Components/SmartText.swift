@@ -17,6 +17,9 @@ struct SmartText: View {
 
     // MARK: - Parser Logic
 
+    private static let mentionRegex = try? NSRegularExpression(pattern: ">>([0-9]+)")
+    private static let urlDetector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+
     /// Concatenates all lines into a single AttributedString with proper formatting.
     private func fullAttributedString() -> AttributedString {
         var result = AttributedString("")
@@ -45,8 +48,7 @@ struct SmartText: View {
         }
 
         // 2. Post Mention detection (e.g., >>123456789)
-        let mentionPattern = ">>([0-9]+)"
-        if let regex = try? NSRegularExpression(pattern: mentionPattern) {
+        if let regex = Self.mentionRegex {
             let nsLine = line as NSString
             let matches = regex.matches(in: line, options: [], range: NSRange(location: 0, length: nsLine.length))
             
@@ -60,15 +62,16 @@ struct SmartText: View {
         }
 
         // 3. Web URL detection
-        let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
-        let matches = detector?.matches(in: line, options: [], range: NSRange(line.startIndex..., in: line)) ?? []
-        
-        for match in matches {
-            if let range = Range(match.range, in: line),
-               let attrRange = Range(range, in: attrString) {
-                attrString[attrRange].foregroundColor = .blue
-                attrString[attrRange].underlineStyle = .single
-                attrString[attrRange].link = match.url
+        if let detector = Self.urlDetector {
+            let matches = detector.matches(in: line, options: [], range: NSRange(line.startIndex..., in: line))
+            
+            for match in matches {
+                if let range = Range(match.range, in: line),
+                   let attrRange = Range(range, in: attrString) {
+                    attrString[attrRange].foregroundColor = .blue
+                    attrString[attrRange].underlineStyle = .single
+                    attrString[attrRange].link = match.url
+                }
             }
         }
 

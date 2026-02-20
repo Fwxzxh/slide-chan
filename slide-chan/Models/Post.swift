@@ -82,6 +82,19 @@ struct Post: Codable, Identifiable {
         return spoiler == 1
     }
 
+    /// Extracts IDs of posts cited in this comment (e.g., >>12345).
+    func replyIds() -> [Int] {
+        guard let text = com else { return [] }
+        // Detects both >> and &gt;&gt; followed by numbers
+        let nsString = text as NSString
+        let results = Self.replyRegex?.matches(in: text, range: NSRange(location: 0, length: nsString.length))
+
+        return results?.compactMap { Int(nsString.substring(with: $0.range(at: 1))) } ?? []
+    }
+
+    private static let replyRegex = try? NSRegularExpression(pattern: "(?:>>|&gt;&gt;)([0-9]+)")
+    private static let htmlTagRegex = try? NSRegularExpression(pattern: "<[^>]+>")
+
     /// Cleans the HTML comment, handling line breaks, tags, and entities.
     var cleanComment: String {
         guard var text = com else { return "" }
@@ -90,22 +103,12 @@ struct Post: Codable, Identifiable {
         text = text.replacingOccurrences(of: "<br>", with: "\n")
 
         // 2. Clean HTML tags (e.g., <span class="quote">)
-        text = text.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+        if let regex = Self.htmlTagRegex {
+            text = regex.stringByReplacingMatches(in: text, options: [], range: NSRange(location: 0, length: text.utf16.count), withTemplate: "")
+        }
 
         // 3. Decode HTML entities
         return text.decodedHTML.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    /// Extracts IDs of posts cited in this comment (e.g., >>12345).
-    func replyIds() -> [Int] {
-        guard let text = com else { return [] }
-        // Detects both >> and &gt;&gt; followed by numbers
-        let pattern = "(?:>>|&gt;&gt;)([0-9]+)"
-        let regex = try? NSRegularExpression(pattern: pattern)
-        let nsString = text as NSString
-        let results = regex?.matches(in: text, range: NSRange(location: 0, length: nsString.length))
-
-        return results?.compactMap { Int(nsString.substring(with: $0.range(at: 1))) } ?? []
     }
 
     /// Generates the URL for the original image.

@@ -47,8 +47,11 @@ final class APIService: APIServiceProtocol, Sendable {
             throw APIError.invalidURL
         }
 
+        var request = URLRequest(url: url)
+        request.setValue("slide-chan/1.0 (iOS; SwiftUI)", forHTTPHeaderField: "User-Agent")
+
         do {
-            let (data, response) = try await URLSession.shared.data(from: url)
+            let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw APIError.invalidResponse

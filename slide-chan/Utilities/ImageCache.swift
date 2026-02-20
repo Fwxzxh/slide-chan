@@ -8,11 +8,10 @@ class ImageLoader: ObservableObject {
     @Published var isLoading = false
     
     private static let cache = URLCache.shared
-    private var cancellable: AnyCancellable?
     
     /// Loads an image from the cache or network.
     /// - Parameter url: The remote URL of the image.
-    func load(from url: URL) {
+    func load(from url: URL) async {
         // 1. Check if we already have the image in memory or are loading
         guard image == nil && !isLoading else { return }
         
@@ -26,20 +25,20 @@ class ImageLoader: ObservableObject {
         
         // 3. If not in cache, load from network
         isLoading = true
-        cancellable = URLSession.shared.dataTaskPublisher(for: request)
-            .map { UIImage(data: $0.data) }
-            .replaceError(with: nil)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] loadedImage in
-                self?.image = loadedImage
-                self?.isLoading = false
-            }
+        defer { isLoading = false }
+        
+        do {
+            let (data, _) = try await URLSession.shared.data(for: request)
+            self.image = UIImage(data: data)
+        } catch {
+            print("Failed to load image from \(url): \(error)")
+            self.image = nil
+        }
     }
     
     /// Cancels the ongoing loading task.
     func cancel() {
-        cancellable?.cancel()
-        cancellable = nil
+        // In async/await, cancellation is handled by the task context
         isLoading = false
     }
 }
@@ -65,15 +64,12 @@ struct CachedImage<Placeholder: View>: View {
                     .aspectRatio(contentMode: contentMode)
             } else {
                 placeholder
-                    .onAppear {
-                        if let url = url {
-                            loader.load(from: url)
-                        }
-                    }
             }
         }
-        .onDisappear {
-            loader.cancel()
+        .task(id: url) {
+            if let url = url {
+                await loader.load(from: url)
+            }
         }
     }
 }
