@@ -10,6 +10,8 @@ extension Color {
     static let cardBackground = Color(UIColor.systemBackground)
     /// Background color for the main content area.
     static let mainBackground = Color(UIColor.secondarySystemBackground)
+    /// Color for highlighting Original Poster mentions.
+    static let opHighlight = Color.purple
 }
 
 /// Shared UI constants for consistent spacing and styling.

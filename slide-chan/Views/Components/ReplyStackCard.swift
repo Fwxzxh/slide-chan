@@ -10,6 +10,11 @@ struct ReplyStackCard: View {
     /// The short board ID (needed for image URLs).
     let board: String
     
+    /// The ID of the Original Poster (OP).
+    var opID: Int? = nil
+    /// The ID of the post currently being viewed.
+    var activeID: Int? = nil
+    
     /// Controls whether to show the attached media in full screen.
     @State private var showFullScreen = false
     
@@ -81,7 +86,7 @@ struct ReplyStackCard: View {
                 
                 // The actual comment text (renders HTML and green text)
                 VStack(alignment: .leading, spacing: 6) {
-                    SmartText(text: node.post.cleanComment)
+                    SmartText(text: node.post.cleanComment, opID: opID, activeID: activeID)
                         .font(.system(size: 14))
                         .lineLimit(8) // Limit vertical height of long replies
                 }

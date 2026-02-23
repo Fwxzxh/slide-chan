@@ -7,6 +7,8 @@ struct ThreadGalleryView: View {
     
     /// The flattened tree of all nodes in the thread.
     let nodes: [ThreadNode]
+    /// The ID of the original post (thread starter).
+    let rootId: Int
     /// Short board ID (e.g., "v").
     let board: String
     
@@ -18,6 +20,9 @@ struct ThreadGalleryView: View {
     @State private var selectedIndex = 0
     @State private var showSlideshow = false
     
+    /// Filter: Only show direct replies to the OP.
+    @State private var onlyDirectReplies = false
+    
     /// Tracks scroll position to conditionally show toolbar title
     @State private var scrollOffset: CGFloat = 0
     
@@ -25,7 +30,17 @@ struct ThreadGalleryView: View {
     private var mediaNodes: [ThreadNode] {
         var seen = Set<Int>()
         var unique: [ThreadNode] = []
+        
+        // Find the root node in our nodes array to identify its direct children
+        let rootNode = nodes.first { $0.post.no == rootId }
+        let directChildIds = Set(rootNode?.replies.map { $0.post.no } ?? [])
+        
         for node in nodes {
+            if onlyDirectReplies {
+                // We include the post if it IS the rootId OR if it is a DIRECT child of rootNode
+                guard node.post.no == rootId || directChildIds.contains(node.post.no) else { continue }
+            }
+            
             if node.post.hasFile && !seen.contains(node.post.no) {
                 seen.insert(node.post.no)
                 unique.append(node)
@@ -87,6 +102,20 @@ struct ThreadGalleryView: View {
                 .opacity(scrollOffset < -60 ? 1 : 0)
                 .animation(.easeInOut(duration: 0.2), value: scrollOffset)
             }
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        onlyDirectReplies.toggle()
+                        visibleItemsCount = 15 // Reset scroll on filter change
+                    }
+                } label: {
+                    // List indent icon for the whole tree, Arrow down-right for direct replies
+                    Image(systemName: onlyDirectReplies ? "arrow.turn.down.right" : "list.bullet.indent")
+                        .font(.system(size: 16, weight: .bold))
+                        .foregroundColor(onlyDirectReplies ? .blue : .primary)
+                }
+            }
         }
         .fullScreenCover(isPresented: $showSlideshow) {
             // Reuses the same FullScreenMediaView as the thread detail.
@@ -145,7 +174,7 @@ struct ThreadGalleryView: View {
                     
                     // 3. Navigation Link to view the post in its original thread location.
                     HStack(spacing: 12) {
-                        NavigationLink(destination: ThreadDetailView(board: board, rootNode: node, depth: 1, onRefresh: nil)) {
+                        NavigationLink(destination: ThreadDetailView(board: board, rootNode: node, opID: rootId, parentID: rootId, depth: 1, onRefresh: nil)) {
                             Label("View Context", systemImage: "arrow.right.circle")
                                 .font(.caption.bold())
                         }
@@ -185,6 +214,7 @@ struct ThreadGalleryView: View {
                 .mockLong,
                 .mockLongFile
             ],
+            rootId: Post.mock.no,
             board: "preview"
         )
     }

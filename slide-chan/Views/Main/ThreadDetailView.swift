@@ -9,6 +9,10 @@ struct ThreadDetailView: View {
     let board: String
     /// The thread node representing the current post and its nested replies.
     let rootNode: ThreadNode
+    /// The ID of the Original Poster (OP) post.
+    let opID: Int
+    /// The ID of the post we are coming from (for highlighting context).
+    let parentID: Int?
     /// The current level in the reply tree (0 for OP, 1 for first-level replies, etc.).
     let depth: Int
     /// Action to refresh the thread data.
@@ -94,6 +98,7 @@ struct ThreadDetailView: View {
         // Dynamic navigation title showing either the subject or the thread ID.
         .navigationTitle(depth == 0 ? (rootNode.post.sub?.decodedHTML ?? "Thread #\(String(rootNode.id))") : "[\(depth)] Replies")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 // Toolbar Items: Bookmark, Refresh, and Gallery buttons.
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -113,7 +118,7 @@ struct ThreadDetailView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink(destination: ThreadGalleryView(nodes: allThreadNodes, board: board)) {
+                    NavigationLink(destination: ThreadGalleryView(nodes: allThreadNodes, rootId: rootNode.post.no, board: board)) {
                         Image(systemName: "square.grid.2x2")
                     }
                 }
@@ -186,13 +191,13 @@ struct ThreadDetailView: View {
             }
             
             // SmartText is a custom view that handles greentext and reply links.
-            SmartText(text: rootNode.post.cleanComment)
-                .font(.system(.body, design: .serif))
-                .lineLimit(isAbbreviated ? 12 : nil)
+            SmartText(text: rootNode.post.cleanComment, opID: opID, activeID: parentID)
+                .lineLimit(isAbbreviated ? 20 : nil)
                 .lineSpacing(4)
             
             // "Read More" button appears if the comment is too long.
-            if rootNode.post.cleanComment.count > 700 || rootNode.post.cleanComment.components(separatedBy: "\n").count > 12 {
+            // Thresholds synced to 20 lines to match the lineLimit.
+            if rootNode.post.cleanComment.count > 1000 || rootNode.post.cleanComment.components(separatedBy: "\n").count > 20 {
                 readMoreButton
             }
         }
@@ -211,8 +216,8 @@ struct ThreadDetailView: View {
                 
                 // Loop through each reply and create a clickable card.
                 ForEach(rootNode.replies) { childNode in
-                    NavigationLink(destination: ThreadDetailView(board: board, rootNode: childNode, depth: depth + 1, onRefresh: onRefresh)) {
-                        ReplyStackCard(node: childNode, board: board)
+                    NavigationLink(destination: ThreadDetailView(board: board, rootNode: childNode, opID: opID, parentID: rootNode.id, depth: depth + 1, onRefresh: onRefresh)) {
+                        ReplyStackCard(node: childNode, board: board, opID: opID, activeID: rootNode.id)
                     }
                     .buttonStyle(PlainButtonStyle())
                     .padding(.vertical, 4)
@@ -346,6 +351,6 @@ extension View {
 
 #Preview {
     NavigationView {
-        ThreadDetailView(board: "v", rootNode: .mockLong, depth: 0)
+        ThreadDetailView(board: "preview", rootNode: .mockLong, opID: ThreadNode.mockLong.id, parentID: nil, depth: 0)
     }
 }

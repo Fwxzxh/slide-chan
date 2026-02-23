@@ -106,7 +106,7 @@ struct ThreadLoadingView: View {
             
             if let rootNode = viewModel.rootNode {
                 // Once data is available, transition to the actual detail view
-                ThreadDetailView(board: board, rootNode: rootNode, depth: 0, onRefresh: { await viewModel.fetchThread() })
+                ThreadDetailView(board: board, rootNode: rootNode, opID: rootNode.id, parentID: nil, depth: 0, onRefresh: { await viewModel.fetchThread() })
             } else if let error = viewModel.errorMessage {
                 // Error state for thread loading
                 VStack(spacing: 16) {

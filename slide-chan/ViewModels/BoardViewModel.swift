@@ -2,27 +2,10 @@ import Foundation
 import Combine
 import SwiftUI
 
-/// Represents a thread bookmarked by the user.
-struct BookmarkedThread: Codable, Identifiable, Hashable {
-    /// Unique identifier: board_threadId.
-    let id: String
-    /// The short ID of the board.
-    let board: String
-    /// The thread ID.
-    let threadId: Int
-    /// Optional thread subject.
-    let subject: String?
-    /// Preview text from the OP comment.
-    let previewText: String?
-    /// When the bookmark was created.
-    let timestamp: Date
-}
-
-/// ViewModel for managing boards, favorites, and bookmarks.
 @MainActor
 class BoardViewModel: ObservableObject {
     /// Singleton instance for shared access.
-    static let shared = BoardViewModel(apiService: APIService.shared)
+    static let shared = BoardViewModel(apiService: APIService.shared, persistenceService: PersistenceService.shared)
     
     /// List of all available boards.
     @Published var boards: [Board] = []
@@ -35,7 +18,6 @@ class BoardViewModel: ObservableObject {
     
     /// List of user bookmarks.
     @Published var bookmarks: [BookmarkedThread] = []
-    private let bookmarksKey = "bookmarked_threads_final"
 
     /// Filter to only show Safe For Work (SFW) boards.
     @Published var showOnlySFW: Bool = false {
@@ -46,12 +28,13 @@ class BoardViewModel: ObservableObject {
 
     private var allBoards: [Board] = []
     private let apiService: APIServiceProtocol
-    private let favoritesKey = "favorite_boards_ids"
+    private let persistenceService: PersistenceService
 
-    init(apiService: APIServiceProtocol) {
+    init(apiService: APIServiceProtocol, persistenceService: PersistenceService) {
         self.apiService = apiService
-        loadFavorites()
-        loadBookmarks()
+        self.persistenceService = persistenceService
+        self.favoriteBoardIDs = persistenceService.loadFavorites()
+        self.bookmarks = persistenceService.loadBookmarks()
     }
 
     // MARK: - Bookmarks Logic
@@ -72,28 +55,13 @@ class BoardViewModel: ObservableObject {
             )
             bookmarks.insert(newBookmark, at: 0)
         }
-        saveBookmarks()
+        persistenceService.saveBookmarks(bookmarks)
     }
 
     /// Checks if a thread is bookmarked.
     func isBookmarked(board: String, threadId: Int) -> Bool {
         let id = "\(board)_\(threadId)"
         return bookmarks.contains(where: { $0.id == id })
-    }
-
-    /// Persists the current list of bookmarks to UserDefaults.
-    private func saveBookmarks() {
-        if let encoded = try? JSONEncoder().encode(bookmarks) {
-            UserDefaults.standard.set(encoded, forKey: bookmarksKey)
-        }
-    }
-
-    /// Loads bookmarked threads from UserDefaults during initialization.
-    private func loadBookmarks() {
-        if let data = UserDefaults.standard.data(forKey: bookmarksKey),
-           let decoded = try? JSONDecoder().decode([BookmarkedThread].self, from: data) {
-            self.bookmarks = decoded
-        }
     }
 
     // MARK: - Boards Logic
@@ -145,19 +113,6 @@ class BoardViewModel: ObservableObject {
                 favoriteBoardIDs.insert(board.board)
             }
         }
-        saveFavorites()
-    }
-
-    /// Persists favorite board IDs to UserDefaults.
-    private func saveFavorites() {
-        let array = Array(favoriteBoardIDs)
-        UserDefaults.standard.set(array, forKey: favoritesKey)
-    }
-
-    /// Loads favorite board IDs from UserDefaults during initialization.
-    private func loadFavorites() {
-        if let array = UserDefaults.standard.stringArray(forKey: favoritesKey) {
-            self.favoriteBoardIDs = Set(array)
-        }
+        persistenceService.saveFavorites(favoriteBoardIDs)
     }
 }

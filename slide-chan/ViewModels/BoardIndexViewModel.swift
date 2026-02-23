@@ -29,6 +29,9 @@ class BoardIndexViewModel: ObservableObject {
             let fetchedThreads = try await apiService.fetchCatalog(board: board)
             self.threads = fetchedThreads
             self.isLoading = false
+        } catch where (error as NSError).code == NSURLErrorCancelled {
+            // Silently ignore cancellations (common when navigating quickly)
+            return
         } catch {
             self.errorMessage = "Error loading catalog: \(error.localizedDescription)"
             self.isLoading = false

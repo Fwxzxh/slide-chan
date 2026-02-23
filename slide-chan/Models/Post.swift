@@ -86,14 +86,9 @@ struct Post: Codable, Identifiable {
     func replyIds() -> [Int] {
         guard let text = com else { return [] }
         // Detects both >> and &gt;&gt; followed by numbers
-        let nsString = text as NSString
-        let results = Self.replyRegex?.matches(in: text, range: NSRange(location: 0, length: nsString.length))
-
-        return results?.compactMap { Int(nsString.substring(with: $0.range(at: 1))) } ?? []
+        let pattern = /(?:>>|&gt;&gt;)([0-9]+)/
+        return text.matches(of: pattern).compactMap { Int($0.1) }
     }
-
-    private static let replyRegex = try? NSRegularExpression(pattern: "(?:>>|&gt;&gt;)([0-9]+)")
-    private static let htmlTagRegex = try? NSRegularExpression(pattern: "<[^>]+>")
 
     /// Cleans the HTML comment, handling line breaks, tags, and entities.
     var cleanComment: String {
@@ -103,9 +98,8 @@ struct Post: Codable, Identifiable {
         text = text.replacingOccurrences(of: "<br>", with: "\n")
 
         // 2. Clean HTML tags (e.g., <span class="quote">)
-        if let regex = Self.htmlTagRegex {
-            text = regex.stringByReplacingMatches(in: text, options: [], range: NSRange(location: 0, length: text.utf16.count), withTemplate: "")
-        }
+        let htmlTagPattern = /<[^>]+>/
+        text = text.replacing(htmlTagPattern, with: "")
 
         // 3. Decode HTML entities
         return text.decodedHTML.trimmingCharacters(in: .whitespacesAndNewlines)
